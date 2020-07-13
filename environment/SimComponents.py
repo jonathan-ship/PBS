@@ -1,82 +1,79 @@
 from collections import deque
 
+EVENT_TRACER = {"event": [], "time": [], "part": [], "process": []}
 
-class Part(object):
-
-    def __init__(self, time, data, id, data_num):
-        self.time = time
-        self.data = data
-        self.id = id
-        self.data_num = data_num
-        self.i = 0
-
-    def __repr__(self):
-        return "id: {}, time: {}".format(self.id, self.time)
+# class Part(object):
+#
+#     def __init__(self, data, id, data_num):
+#         self.data = data
+#         self.id = id
+#         self.data_num = data_num
+#         self.i = 0
 
 
-class Source(object):
-
-    def __init__(self, env, name, block_data, process_dict, data_num, event_tracer=None, data_type=None):
-        self.env = env
-        self.name = name
-        self.block_data = block_data  # "df" -> 전체 dataframe / "gen" -> generator 함수
-        self.process_dict = process_dict
-        self.data_num = data_num  # 전체 블록 갯수
-        self.event_tracer = event_tracer
-        self.data_type = data_type  # "df" : dataframe / "gen" : generator
-
-        self.action = env.process(self.run())
-        self.parts_sent = 0
-        self.flag = False
-
-    def run(self):
-        while True:
-            # data 받아오기
-            if self.data_type == "gen":
-                p = next(self.block_data)
-            else:
-                p = self.block_data.iloc[self.parts_sent]
-
-            # part 생성
-            part = Part(self.env.now, p, p["part"], self.data_num)
-
-            # IAT
-            if self.parts_sent != 0:
-                IAT = part.data[(0, 'start_time')] - self.env.now
-                if IAT > 0:
-                    yield self.env.timeout(part.data[(0, 'start_time')] - self.env.now)
-
-            # record: part_created
-            self.record(self.env.now, part.id, self.name, event="part_created")
-
-            # next process
-            idx = part.data[(part.i, 'process')]
-            if len(self.process_dict[idx].queue) + self.process_dict[idx].server_num - self.process_dict[
-                idx].server.count(None) >= self.process_dict[idx].qlimit:
-                self.process_dict[idx].waiting.append(self.env.event())
-                # record: delay_start
-                self.record(self.env.now, None, self.name, event="delay_start")
-
-                yield self.process_dict[idx].waiting[-1]
-
-            # record: part_transferred
-            self.record(self.env.now, part.id, self.name, event="part_transferred")
-            # part_transferred
-            self.parts_sent += 1
-            self.process_dict[idx].put(part)
-
-            if self.parts_sent == self.data_num:
-                print('all parts are sent')
-                break
-
-            if self.parts_sent == self.data_num:  # 해당 공정 종료
-                self.flag = True
-
-    def record(self, time, part, process, event=None):
-        self.event_tracer["event"].append(event)
-        self.event_tracer["time"].append(time)
-        self.event_tracer["part"].append(part)
-        self.event_tracer["process"].append(process)
+# class Source(object):
+#
+#     def __init__(self, env, name, block_data, process_dict, data_num, event_tracer=None, data_type=None):
+#         self.env = env
+#         self.name = name
+#         self.block_data = block_data  # "df" -> 전체 dataframe / "gen" -> generator 함수
+#         self.process_dict = process_dict
+#         self.data_num = data_num  # 전체 블록 갯수
+#         self.event_tracer = event_tracer
+#         self.data_type = data_type  # "df" : dataframe / "gen" : generator
+#
+#         self.action = env.process(self.run())
+#         self.parts_sent = 0
+#         self.flag = False
+#
+#     def run(self):
+#         while True:
+#             # data 받아오기
+#             if self.data_type == "gen":
+#                 p = next(self.block_data)
+#             else:
+#                 p = self.block_data.iloc[self.parts_sent]
+#
+#             # part 생성
+#             part = Part(p, p["part"], self.data_num)
+#
+#             # IAT
+#             if self.parts_sent != 0:
+#                 IAT = part.data[(0, 'start_time')] - self.env.now
+#                 if IAT > 0:
+#                     yield self.env.timeout(part.data[(0, 'start_time')] - self.env.now)
+#
+#             # record: part_created
+#             self.record(self.env.now, part.id, self.name, event="part_created")
+#
+#             # next process
+#             idx = part.data[(part.i, 'process')]
+#             if len(self.process_dict[idx].queue) + self.process_dict[idx].server_num - self.process_dict[
+#                 idx].server.count(None) >= self.process_dict[idx].qlimit:
+#                 self.process_dict[idx].waiting.append(self.env.event())
+#                 # record: delay_start
+#                 self.record(self.env.now, None, self.name, event="delay_start")
+#
+#                 yield self.process_dict[idx].waiting[-1]
+#
+#             # record: part_transferred
+#             self.record(self.env.now, part.id, self.name, event="part_transferred")
+#             # part_transferred
+#             self.parts_sent += 1
+#             self.process_dict[idx].put(part)
+#
+#             if self.parts_sent == self.data_num:
+#                 print('all parts are sent')
+#                 break
+#
+#             if self.parts_sent == self.data_num:  # 해당 공정 종료
+#                 self.flag = True
+#
+#     def record(self, time, part, process, event=None):
+#         self.event_tracer["event"].append(event)
+#         self.event_tracer["time"].append(time)
+#         self.event_tracer["part"].append(part)
+#         self.event_tracer["process"].append(process)
 
 
 class Sink(object):
@@ -108,12 +105,11 @@ class Sink(object):
 
 class Process(object):
 
-    def __init__(self, env, name, server_num, process_dict, event_tracer=None, qlimit=None):
+    def __init__(self, env, name, server_num, process_dict, qlimit=None):
         self.name = name
         self.env = env
         self.server_num = server_num
         self.process_dict = process_dict
-        self.event_tracer = event_tracer
         self.qlimit = qlimit
 
         self.server = [None for _ in range(server_num)]
@@ -187,7 +183,11 @@ class Process(object):
             self.record(self.env.now, part.id, self.name, event="queue_entered")
 
     def record(self, time, part, process, event=None):
-        self.event_tracer["event"].append(event)
-        self.event_tracer["time"].append(time)
-        self.event_tracer["part"].append(part)
-        self.event_tracer["process"].append(process)
+        EVENT_TRACER["event"].append(event)
+        EVENT_TRACER["time"].append(time)
+        EVENT_TRACER["part"].append(part)
+        EVENT_TRACER["process"].append(process)
+
+# event tracer을 _get_reward 함수로 return 해 주는 함수
+def return_event_tracer():
+    return EVENT_TRACER
