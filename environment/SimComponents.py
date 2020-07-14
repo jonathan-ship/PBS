@@ -45,6 +45,7 @@ class Process(object):
         self.parts_rec = 0
         self.parts_sent = 0
         self.flag = False
+        self.part_in_progress = []
 
     def run(self, part, server_id):
         # record: work_start
@@ -78,6 +79,7 @@ class Process(object):
         # record: part_transferred
         self.record(self.env.now, part.id, self.name, event="part_transferred")
         # part_transferred
+        del self.part_in_progress[0]
         self.process_dict[next_process].put(part)
         part.step += 1
         self.parts_sent += 1
@@ -100,6 +102,7 @@ class Process(object):
     def put(self, part):
         self.parts_rec += 1
         if self.server.count(None) != 0:  # server에 자리가 있으면
+            self.part_in_progress.append([part.id, part[(part.step, 'process_time')]])
             self.server[self.server.index(None)] = self.env.process(self.run(part, self.server.index(None)))
         else:  # server가 다 차 있으면
             self.queue.append(part)
