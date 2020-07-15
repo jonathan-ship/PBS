@@ -43,33 +43,35 @@ class Assembly(object):
         return self._get_state()
 
     def _get_state(self):
+        # 전체 state 변수를 -1로 초기화
         state = np.full(self.observation_space, self.empty)
+
+        # queue에 블록을 할당
         if len(self.inbound_panel_blocks) > 0 and len(self.queue) < self.len_of_queue:
             num = min(len(self.inbound_panel_blocks), self.len_of_queue - len(self.queue))
             for i in range(num):
                 panel_block = self.inbound_panel_blocks.pop()
                 self.queue.append(panel_block)
 
-        # 각 공정별 남은 시간
+        # 각 공정별 블록의 남은 작업 시간 정보
         remaining_working_time = []
+        now = self.env.now  # 현재 시각
         for i in range(self.num_of_processes):
-            now = self.env.now  # 현재 시각
             process = self.model['Process{0}'.format(i)]  # modeling한 Process
-            part = process.part_in_progress[0]  # [part_id, working_time]
-            part_id = part[0]
-            working_time = part[1]
+            part_id, working_time = process.part_in_progress[0]  # [part_id, working_time]
             part_start_time = self.event_tracer['time'][
                 (self.event_tracer['part'] == part_id) & (self.event_tracer['process'] == 'Process{0}'.format(i)) & (
                             self.event_tracer['event'] == 'work_start')]
             remaining_working_time.append(working_time - (now - part_start_time))
-
         state[:self.num_of_processes] = remaining_working_time
 
-        for i, panel_block in enumerate(self.queue):  # queue에 있는 블록 정보
-            working_time_list = panel_block.data[:, 'process_time']
-            working_time_list += list(working_time_list[:self.num_of_processes - 1])
+        # queue에 있는 블록의 각 공정에서의 작업 시간 정보
+        planned_working_time = []
+        for panel_block in self.queue:  # queue에 있는 블록 정보
+            working_time = panel_block.data[:, 'process_time']
+            planned_working_time += list(working_time[:self.num_of_processes])
 
-        state[self.num_of_processes:self.num_of_processes+len(working_time_list)] = working_time_list
+        state[self.num_of_processes:self.num_of_processes + len(planned_working_time)] = planned_working_time
 
         return state
 
@@ -111,7 +113,6 @@ class Assembly(object):
         #     TH_list.append(df_TH.loc[i + 1] - df_TH.loc[i])
         #
         # process_throughput = 1 / np.mean(TH_list)
-
 
     def _modeling(self, num_of_processes):
         from environment.SimComponents import Process, Sink, return_event_tracer
