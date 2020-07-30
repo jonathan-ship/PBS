@@ -76,43 +76,16 @@ class Assembly(object):
         return state
 
     def _calculate_reward(self):
-        pass
-        # utilization
-        # for i in range(self.num_of_processes):  # process 마다 utilization 계산
-        #     # 공정에 관한 event 중 work_start인 event의 시간 저장 (총 시간 계산, working time 시간 계산 시 사용)
-        #     work_start = self.event_tracer["time"][(self.event_tracer["process"] == 'Process{0}'.format(i)) & (self.event_tracer["event"] == "work_start")]
-        #     work_start = work_start.reset_index(drop=True)
-        #
-        #     # 공정에 관한 event 중 part_transferred인 event의 시간 저장 (총 시간 계산)
-        #     part_transferred = self.event_tracer["time"][
-        #         (self.event_tracer["process"] == 'Process{0}'.format(i)) & (self.event_tracer["event"] == "part_transferred")]
-        #     part_transferred = part_transferred.reset_index(drop=True)
-        #
-        #     # 공정에 관한 event 중 work_finish인 event의 시간 저장 (working time 시간 계산 시 사용)
-        #     work_finish = self.event_tracer["time"][(self.event_tracer["process"] == 'Process{0}'.format(i)) & (self.event_tracer["event"] == "work_finish")]
-        #     work_finish = work_finish.reset_index(drop=True)
-        #
-        #     # 총 가동 시간
-        #     total_time = (part_transferred[len(part_transferred) - 1] - work_start[0]) * (self.model['Process{0}'.format(i)].server_num)
-        #
-        #     # 총 작업 시간
-        #     df_working = work_finish - work_start
-        #     total_working = np.sum(df_working)
-        #
-        #     # 가동률
-        #     u_dict = {}
-        #     u_dict['Process{0}'.format(i)] = total_working / total_time
-
         # throughput
-        # df_TH = self.event_tracer["time"][
-        #     (self.self.event_tracer["event"] == "part_transferred") & (self.event_tracer["process"] == 'Process{0}'.format(self.num_of_processes - 1))]
-        # df_TH = df_TH.reset_index(drop=True)
-        #
-        # TH_list = []
-        # for i in range(len(df_TH) - 1):
-        #     TH_list.append(df_TH.loc[i + 1] - df_TH.loc[i])
-        #
-        # process_throughput = 1 / np.mean(TH_list)
+        df_TH = self.event_tracer["time"][
+            (self.event_tracer["event"] == "part_transferred") &
+            (self.event_tracer["process"] == 'Process{0}'.format(self.num_of_processes - 1))]
+        df_TH = df_TH.reset_index(drop=True)
+
+        TH_list = []
+        for i in range(len(df_TH) - 1):
+            TH_list.append(df_TH.loc[i + 1] - df_TH.loc[i])
+        process_throughput = 1 / np.mean(TH_list)
 
     def _modeling(self, num_of_processes):
         from environment.SimComponents import Process, Sink, return_event_tracer
