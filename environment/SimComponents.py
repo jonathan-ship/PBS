@@ -115,29 +115,32 @@ class SubProcess(object):
         self.queue = simpy.Store(self.env)
         self.waiting = []
         self.flag = False  # SubProcess의 작업 여부
+        self.part = None
+        self.working_start = 0.0
 
     def run(self):
         while True:
             # queue로부터 part 가져오기
-            part = yield self.queue.get()
+            self.part = yield self.queue.get()
             self.process_dict[self.process_name].parts_sent += 1
             self.flag = True
             # record: work_start
-            record(self.env.now, self.process_name, part_id=part.id, server_id=self.name, event="work_start")
+            record(self.env.now, self.process_name, part_id=self.part.id, server_id=self.name, event="work_start")
 
             # work start
-            proc_time = self.process_time if self.process_time is not None else part.data[(part.step, "process_time")]
+            self.working_start = self.env.now
+            proc_time = self.process_time if self.process_time is not None else self.part.data[(self.part.step, "process_time")]
             yield self.env.timeout(proc_time)
 
             # record: work_finish
-            record(self.env.now, self.process_name, part_id=part.id, server_id=self.name, event="work_finish")
+            record(self.env.now, self.process_name, part_id=self.part.id, server_id=self.name, event="work_finish")
 
             # next process
-            next_process = part.data[(part.step + 1, 'process')]
+            next_process = self.part.data[(self.part.step + 1, 'process')]
 
             if self.process_dict[next_process].__class__.__name__ == 'Process':
                 # lag: 후행공정 시작시간 - 선행공정 종료시간
-                lag = part.data[(part.step + 1, 'start_time')] - self.env.now
+                lag = self.part.data[(self.part.step + 1, 'start_time')] - self.env.now
                 if lag > 0:
                     yield self.env.timeout(lag)
                 # delay start
@@ -152,11 +155,13 @@ class SubProcess(object):
                     record(self.env.now, self.process_name, server_id=self.name, event="delay_finish")
 
             # record: part_transferred
-            record(self.env.now, self.process_name, part_id=part.id, server_id=self.name, event="part_transferred")
+            record(self.env.now, self.process_name, part_id=self.part.id, server_id=self.name, event="part_transferred")
             # part_transferred
-            self.process_dict[next_process].put(part)
-            part.step += 1
+            self.process_dict[next_process].put(self.part)
+            self.part.step += 1
             self.flag = False
+
+            self.part = None
 
             # delay finish
             server, queue = self.process_dict[self.process_name].get_num_of_part()

@@ -4,31 +4,33 @@ import numpy as np
 
 def import_panel_block_schedule(filepath):
     df_schedule = pd.read_csv(filepath, encoding='euc-kr')
+    df_schedule = df_schedule.drop(columns=['unit_assy'])
+    num_of_processes = len(df_schedule.columns) - 1
     panel_blocks = []
-    for i in range(len(df_schedule)):
-        temp = df_schedule.iloc[i]
-        panel_block = PanelBlock(temp)
+    for i, block in df_schedule.iterrows():
+        panel_block = PanelBlock(block['product'], block.drop(['product']))
         panel_blocks.append(panel_block)
-    return panel_blocks
+    return panel_blocks, num_of_processes
 
 
 class PanelBlock(object):
-    def __init__(self, panel_block):
+    def __init__(self, block_id, block_working_time):
         # block_id
-        self.id = panel_block['product']
+        self.id = block_id
         # 작업 시간 저장
-        panel_block = panel_block.drop(['product', 'unit_assy'])
-        index = pd.MultiIndex.from_product([[i for i in range(len(panel_block.index)+1)], ['start_time', 'process_time', 'process']])
+        index = pd.MultiIndex.from_product([[i for i in range(len(block_working_time.index)+1)],
+                                            ['start_time', 'process_time', 'process']])
         self.data = pd.Series(index=index, dtype=float)
-        for i, process in enumerate(panel_block.index):
-            self.data[(i, 'process_time')] = panel_block[process]
+        for i, process in enumerate(block_working_time.index):
+            self.data[(i, 'process_time')] = block_working_time[process]
             self.data[(i, 'process')] = 'Process{0}'.format(i)
-        self.data[len(panel_block.index), 'process'] = 'Sink'
+        self.data[len(block_working_time.index), 'process'] = 'Sink'
         # 지나간 공정 수
         self.step = 0
 
 
 if __name__ == "__main__":
-    panel_blocks = import_panel_block_schedule('../environment/data/PBS_assy_sequence_gen_000.csv')
+    panel_blocks, num_of_process = import_panel_block_schedule('../environment/data/PBS_assy_sequence_gen_000.csv')
     working_time_list = panel_blocks[0].data[:, 'process_time']
-    print(working_time_list[:6])
+    print(num_of_process)
+    print(working_time_list[:])
