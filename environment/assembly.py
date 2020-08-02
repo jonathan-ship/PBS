@@ -1,6 +1,7 @@
 import simpy
 import random
 import pygame
+import os
 
 import numpy as np
 
@@ -15,8 +16,10 @@ class Assembly(object):
         self.inbound_panel_blocks = inbound_panel_blocks
         self.inbound_panel_blocks_clone = self.inbound_panel_blocks[:]
         self.queue = []
+        self.time = 0.0
+        self.num_of_blocks_put = 0
         self.stage = 0
-        self.empty = -1
+        self.empty = -1.0
         if display_env:
             display = AssemblyDisplay()
             display.game_loop_from_space()
@@ -24,22 +27,24 @@ class Assembly(object):
     def step(self, action):
         done = False
         block = self.queue.pop(action)
-        self.model['Process0'].put(block)
+        self.env.process(self.model['Process0'].put(block, 'Source', None))
+        self.num_of_blocks_put += 1
         while True:
             self.env.step()
-            num_of_working_server, _ = self.model['Process0'].get_num_of_part()
-            if self.model['Process0'].server_num - num_of_working_server > 0:
+            if self.model['Process0'].parts_sent - self.num_of_blocks_put == 0:
                 break
         if len(self.queue) == 0:
             done = True
-            self.env.run()
         next_state = self._get_state()
         reward = self._calculate_reward()
-        return next_state, reward, done
+        tau = self.env.now - self.time
+        self.time = self.env.now
+        return next_state, reward, tau, done
 
     def reset(self):
         self.inbound_panel_blocks = self.inbound_panel_blocks_clone[:]
         random.shuffle(self.inbound_panel_blocks)
+        self.num_of_blocks_put = 0
         self.stage = 0
         return self._get_state()
 
@@ -80,6 +85,7 @@ class Assembly(object):
 
     def _calculate_reward(self):
         block_completed = self.event_tracer[
+            (self.event_tracer['TIME'] > self.time) &
             (self.event_tracer["EVENT"] == "part_transferred") &
             (self.event_tracer["PROCESS"] == 'Process{0}'.format(self.num_of_processes - 1))]
         num_of_block_completed = len(block_completed)
@@ -127,14 +133,28 @@ if __name__ == '__main__':
     len_of_queue = 10
     assembly = Assembly(num_of_processes, len_of_queue, inbound_panel_blocks=panel_blocks)
     s = assembly.reset()
-    for i in range(50):
-        print(i)
-        s_next, r, d = assembly.step(0)
-        print(s_next)
+    t = 0
+    r_cum = 0
+    for i in range(70):
+        s_next, r, tau, d = assembly.step(0)
+        r_cum += r
+        t += tau
+        print("step: {0} | parts_sent: {1} | parts_completed: {2} | reward: {3} | cumulative reward: {4} | time: {5}"
+              .format(i, assembly.model['Process0'].parts_sent, assembly.model['Sink'].parts_rec, r, r_cum, t))
         s = s_next
         if d:
             break
-    print(s)
 
+    print(assembly.env.now)
+
+    # save data
+    save_path = './result'
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    # event tracer dataframe으로 변환
+    #df_event_tracer = pd.DataFrame(event_tracer)
+    df_event_tracer = pd.DataFrame(assembly.event_tracer)
+    df_event_tracer.to_excel(save_path +'/event_PBS_rev.xlsx')
 
 

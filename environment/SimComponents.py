@@ -21,7 +21,6 @@ class Source(object):
         self.name = name
         self.block_data = block_data
         self.process_dict = process_dict
-
         self.action = env.process(self.run)
         self.parts_sent = 0
         self.flag = False
@@ -45,24 +44,12 @@ class Source(object):
 
             # next process
             next_process = part.data[(part.step, 'process')]
-
-            # delay start
-            next_server, next_queue = self.process_dict[next_process].get_num_of_part()
-            if next_queue + next_server >= self.process_dict[next_process].qlimit:
-                self.process_dict[next_process].waiting.append(self.env.event())
-                # record: delay_start
-                record(self.env.now, self.name, event="delay_start")
-
-                yield self.process_dict[next_process].waiting[-1]
-                # delay_finish
-                record(self.env.now, self.name, event="delay_start")
+            self.env.process(self.process_dict[next_process].put(part, self.name, None))
+            self.parts_sent += 1
 
             # part transferred
             # record: part_transferred
             record(self.env.now, self.name, part_id=part.id, event="part_transferred")
-            # part_transferred
-            self.parts_sent += 1
-            self.process_dict[next_process].put(part)
 
             if self.parts_sent == len(self.block_data):
                 break
@@ -81,13 +68,30 @@ class Process(object):
         self.parts_sent = 0
         self.server_idx = 0
 
-    def put(self, part):
+    def put(self, part, process_from, server_from):
         # Routing
         routing = Routing(self.process_dict[self.name])
         if self.routing_logic == "most_unutilized":  # most_unutilized
             self.server_idx = routing.most_unutilized()
         else:
             self.server_idx = 0 if (self.parts_sent == 0) or (self.server_idx == self.server_num-1) else self.server_idx + 1
+
+        # lag: 후행공정 시작시간 - 선행공정 종료시간
+        if part.data[(part.step + 1, 'start_time')]:
+            lag = part.data[(part.step + 1, 'start_time')] - self.env.now
+            if lag > 0:
+                yield self.env.timeout(lag)
+        # delay start
+        server, queue = self.get_num_of_part()
+        if queue + server >= self.qlimit:
+            self.server[self.server_idx].waiting.append(self.env.event())
+            # record: delay_start
+            record(self.env.now, process_from, part_id=part.id, server_id=server_from, event="delay_start")
+
+            yield self.server[self.server_idx].waiting[-1]
+            # record: delay_finish
+            record(self.env.now, process_from, part_id=part.id, server_id=server_from, event="delay_finish")
+
         record(self.env.now, self.name, part_id=part.id, server_id=self.server[self.server_idx].name, event="queue_entered")
         self.server[self.server_idx].queue.put(part)
 
@@ -122,7 +126,6 @@ class SubProcess(object):
         while True:
             # queue로부터 part 가져오기
             self.part = yield self.queue.get()
-            self.process_dict[self.process_name].parts_sent += 1
             self.flag = True
             # record: work_start
             record(self.env.now, self.process_name, part_id=self.part.id, server_id=self.name, event="work_start")
@@ -137,27 +140,14 @@ class SubProcess(object):
 
             # next process
             next_process = self.part.data[(self.part.step + 1, 'process')]
-
             if self.process_dict[next_process].__class__.__name__ == 'Process':
-                # lag: 후행공정 시작시간 - 선행공정 종료시간
-                lag = self.part.data[(self.part.step + 1, 'start_time')] - self.env.now
-                if lag > 0:
-                    yield self.env.timeout(lag)
-                # delay start
-                next_server, next_queue = self.process_dict[next_process].get_num_of_part()
-                if next_queue + next_server >= self.process_dict[next_process].qlimit:
-                    self.process_dict[next_process].waiting.append(self.env.event())
-                    # record: delay_start
-                    record(self.env.now, self.process_name, server_id=self.name, event="delay_start")
-
-                    yield self.process_dict[next_process].waiting[-1]
-                    # record: delay_finish
-                    record(self.env.now, self.process_name, server_id=self.name, event="delay_finish")
-
+                yield self.env.process(self.process_dict[next_process].put(self.part, self.process_name, self.name))
+            else:
+                self.process_dict[next_process].put(self.part)
+            self.process_dict[self.process_name].parts_sent += 1
             # record: part_transferred
             record(self.env.now, self.process_name, part_id=self.part.id, server_id=self.name, event="part_transferred")
-            # part_transferred
-            self.process_dict[next_process].put(self.part)
+
             self.part.step += 1
             self.flag = False
 

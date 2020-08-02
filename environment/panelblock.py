@@ -31,6 +31,4 @@ class PanelBlock(object):
 
 if __name__ == "__main__":
     panel_blocks, num_of_process = import_panel_block_schedule('../environment/data/PBS_assy_sequence_gen_000.csv')
-    working_time_list = panel_blocks[0].data[:, 'process_time']
-    print(num_of_process)
-    print(working_time_list[:])
+    print(panel_blocks[0].data)
