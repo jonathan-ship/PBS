@@ -26,22 +26,27 @@ class Assembly(object):
 
     def step(self, action):
         done = False
-        block = self.queue.pop(action)
-        self.env.process(self.model['Process0'].put(block, 'Source', None))
-        self.num_of_blocks_put += 1
-        while True:
-            self.env.step()
-            if self.model['Process0'].parts_sent - self.num_of_blocks_put == 0:
-                break
-        if len(self.queue) == 0:
-            done = True
+        if action >= len(self.queue):
+            reward = -1
+        else:
+            block = self.queue.pop(action)
+            self.env.process(self.model['Process0'].put(block, 'Source', None, 0))
+            self.num_of_blocks_put += 1
+            while True:
+                self.env.step()
+                if self.model['Process0'].parts_sent - self.num_of_blocks_put == 0:
+                    break
+            if len(self.queue) == 0:
+                done = True
+            reward = self._calculate_reward()
+            tau = self.env.now - self.time
+            self.time = self.env.now
         next_state = self._get_state()
-        reward = self._calculate_reward()
-        tau = self.env.now - self.time
-        self.time = self.env.now
-        return next_state, reward, tau, done
+        return next_state, reward, done
 
     def reset(self):
+        print("---------reset----------")
+        self.env, self.model, self.event_tracer = self._modeling(self.num_of_processes)
         self.inbound_panel_blocks = self.inbound_panel_blocks_clone[:]
         random.shuffle(self.inbound_panel_blocks)
         self.num_of_blocks_put = 0
@@ -136,14 +141,17 @@ if __name__ == '__main__':
     t = 0
     r_cum = 0
     for i in range(70):
-        s_next, r, tau, d = assembly.step(0)
+        s_next, r, d = assembly.step(i % 10)
         r_cum += r
-        t += tau
+        #t += tau
         print("step: {0} | parts_sent: {1} | parts_completed: {2} | reward: {3} | cumulative reward: {4} | time: {5}"
               .format(i, assembly.model['Process0'].parts_sent, assembly.model['Sink'].parts_rec, r, r_cum, t))
         s = s_next
         if d:
             break
+    s = assembly.reset()
+    for i in assembly.inbound_panel_blocks:
+        print(i.step)
 
     print(assembly.env.now)
 

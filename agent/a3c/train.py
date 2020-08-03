@@ -190,7 +190,7 @@ if __name__ == '__main__':
         if num_workers > 8:
             num_workers = 8
         # Create worker classes
-        for i in range(num_workers):
+        for i in range(1):
             assembly = Assembly(num_of_processes, len_of_queue, inbound_panel_blocks=panel_blocks)
             workers.append(Worker(assembly, i, s_size, a_size, trainer, model_path, summary_path, global_episodes))
         saver = tf.train.Saver(max_to_keep=5)
