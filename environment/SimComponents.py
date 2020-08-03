@@ -81,6 +81,7 @@ class Process(object):
             lag = part.data[(part.step + 1, 'start_time')] - self.env.now
             if lag > 0:
                 yield self.env.timeout(lag)
+
         # delay start
         server, queue = self.get_num_of_part()
         if queue + server >= self.qlimit:
@@ -126,7 +127,10 @@ class SubProcess(object):
         while True:
             # queue로부터 part 가져오기
             self.part = yield self.queue.get()
+            record(self.env.now, self.process_name, part_id=self.part.id, server_id=self.name, event="queue_released")
+            self.process_dict[self.process_name].parts_sent += 1
             self.flag = True
+
             # record: work_start
             record(self.env.now, self.process_name, part_id=self.part.id, server_id=self.name, event="work_start")
 
@@ -139,6 +143,10 @@ class SubProcess(object):
             record(self.env.now, self.process_name, part_id=self.part.id, server_id=self.name, event="work_finish")
 
             # next process
+            self.part.step += 1
+            while (self.part.data[(self.part.step, 'process_time')] == 0) and (self.part.data[(self.part.step, 'process') != 'Sink']):
+                self.part.step += 1
+
             next_process = self.part.data[(self.part.step + 1, 'process')]
             if self.process_dict[next_process].__class__.__name__ == 'Process':
                 yield self.env.process(self.process_dict[next_process].put(self.part, self.process_name, self.name))
@@ -148,7 +156,6 @@ class SubProcess(object):
             # record: part_transferred
             record(self.env.now, self.process_name, part_id=self.part.id, server_id=self.name, event="part_transferred")
 
-            self.part.step += 1
             self.flag = False
 
             self.part = None
