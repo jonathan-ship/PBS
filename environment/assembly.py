@@ -42,12 +42,14 @@ class Assembly(object):
             tau = self.env.now - self.time
             self.time = self.env.now
         next_state = self._get_state()
-        return next_state, reward, done
+        return next_state, reward, tau, done
 
     def reset(self):
         print("---------reset----------")
         self.env, self.model, self.event_tracer = self._modeling(self.num_of_processes)
         self.inbound_panel_blocks = self.inbound_panel_blocks_clone[:]
+        for panel_block in self.inbound_panel_blocks:
+            panel_block.step = 0
         random.shuffle(self.inbound_panel_blocks)
         self.num_of_blocks_put = 0
         self.stage = 0
@@ -141,17 +143,14 @@ if __name__ == '__main__':
     t = 0
     r_cum = 0
     for i in range(70):
-        s_next, r, d = assembly.step(i % 10)
+        s_next, r, tau, d = assembly.step(i % 10)
         r_cum += r
-        #t += tau
+        t += tau
         print("step: {0} | parts_sent: {1} | parts_completed: {2} | reward: {3} | cumulative reward: {4} | time: {5}"
               .format(i, assembly.model['Process0'].parts_sent, assembly.model['Sink'].parts_rec, r, r_cum, t))
         s = s_next
         if d:
             break
-    s = assembly.reset()
-    for i in assembly.inbound_panel_blocks:
-        print(i.step)
 
     print(assembly.env.now)
 
@@ -160,8 +159,6 @@ if __name__ == '__main__':
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    # event tracer dataframe으로 변환
-    #df_event_tracer = pd.DataFrame(event_tracer)
     df_event_tracer = pd.DataFrame(assembly.event_tracer)
     df_event_tracer.to_excel(save_path +'/event_PBS_rev.xlsx')
 

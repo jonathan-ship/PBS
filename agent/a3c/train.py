@@ -101,7 +101,7 @@ class Worker():
                         a = np.random.choice(a_dist[0], p=a_dist[0])
                         a = np.argmax(a_dist == a)
 
-                        s1, r, d = self.env.step(a)
+                        s1, r, _, d = self.env.step(a)
 
                         episode_buffer.append([s, a, r, s1, d, v[0, 0]])
                         episode_values.append(v[0, 0])
