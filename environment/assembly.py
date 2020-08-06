@@ -1,4 +1,5 @@
 import simpy
+import pandas as pd
 import random
 import pygame
 import os
@@ -10,7 +11,9 @@ random.seed(42)
 
 class Assembly(object):
     def __init__(self, num_of_processes, len_of_queue, inbound_panel_blocks=None, display_env=False):
-        self.env, self.model, self.event_tracer = self._modeling(num_of_processes)
+        self.columns = ["TIME", "EVENT", "PART", "PROCESS", "SERVER_ID"]
+        self.event_tracer = pd.DataFrame(columns=self.columns)
+        self.env, self.model = self._modeling(num_of_processes)
         self.num_of_processes = num_of_processes
         self.len_of_queue = len_of_queue
         self.a_size = len_of_queue
@@ -48,13 +51,14 @@ class Assembly(object):
         return next_state, reward, done
 
     def reset(self):
-        self.env, self.model, self.event_tracer = self._modeling(self.num_of_processes)
+        self.env, self.model = self._modeling(self.num_of_processes)
         self.inbound_panel_blocks = self.inbound_panel_blocks_clone[:]
         for panel_block in self.inbound_panel_blocks:
             panel_block.step = 0
         random.shuffle(self.inbound_panel_blocks)
         self.num_of_blocks_put = 0
         self.stage = 0
+        self.event_tracer = pd.DataFrame([], columns=self.columns)
         return self._get_state()
 
     def _get_state(self):
@@ -117,15 +121,15 @@ class Assembly(object):
         return process_throughput
 
     def _modeling(self, num_of_processes):
-        from environment.SimComponents import Process, Sink, return_event_tracer
+        from environment.SimComponents import Process, Sink
         env = simpy.Environment()
         model = {}
         for i in range(num_of_processes + 1):
-            model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, qlimit=1)
+            model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, self.event_tracer, qlimit=1)
             if i == num_of_processes:
                 model['Sink'] = Sink(env, 'Sink')
-        event_tracer = return_event_tracer()
-        return env, model, event_tracer
+
+        return env, model
 
 
 class AssemblyDisplay(object):
@@ -147,9 +151,8 @@ if __name__ == '__main__':
     print("step 0 ------ reset")
     print(s)
     for i in range(70):
-        s_next, r, tau, d = assembly.step(0)
+        s_next, r, d = assembly.step(0)
         r_cum += r
-        t += tau
         print("step: {0} | parts_sent: {1} | parts_completed: {2} | reward: {3} | cumulative reward: {4} | time: {5}"
               .format(i, assembly.model['Process0'].parts_sent, assembly.model['Sink'].parts_rec, r, r_cum, t))
         s = s_next
