@@ -5,6 +5,8 @@ import os
 
 import numpy as np
 
+random.seed(42)
+
 
 class Assembly(object):
     def __init__(self, num_of_processes, len_of_queue, inbound_panel_blocks=None, display_env=False):
@@ -35,17 +37,17 @@ class Assembly(object):
             while True:
                 self.env.step()
                 if self.model['Process0'].parts_sent - self.num_of_blocks_put == 0:
+                    while self.env.peek() == self.env.now:
+                        self.env.run(self.env.timeout(0))
                     break
             if len(self.queue) == 0:
                 done = True
             reward = self._calculate_reward()
-            tau = self.env.now - self.time
             self.time = self.env.now
         next_state = self._get_state()
-        return next_state, reward, tau, done
+        return next_state, reward, done
 
     def reset(self):
-        print("---------reset----------")
         self.env, self.model, self.event_tracer = self._modeling(self.num_of_processes)
         self.inbound_panel_blocks = self.inbound_panel_blocks_clone[:]
         for panel_block in self.inbound_panel_blocks:
@@ -142,8 +144,10 @@ if __name__ == '__main__':
     s = assembly.reset()
     t = 0
     r_cum = 0
+    print("step 0 ------ reset")
+    print(s)
     for i in range(70):
-        s_next, r, tau, d = assembly.step(i % 10)
+        s_next, r, tau, d = assembly.step(0)
         r_cum += r
         t += tau
         print("step: {0} | parts_sent: {1} | parts_completed: {2} | reward: {3} | cumulative reward: {4} | time: {5}"
