@@ -11,15 +11,14 @@ random.seed(42)
 
 class Assembly(object):
     def __init__(self, num_of_processes, len_of_queue, inbound_panel_blocks=None, display_env=False):
-        self.columns = ["TIME", "EVENT", "PART", "PROCESS", "SERVER_ID"]
-        self.event_tracer = pd.DataFrame(columns=self.columns)
-        self.env, self.model = self._modeling(num_of_processes)
         self.num_of_processes = num_of_processes
         self.len_of_queue = len_of_queue
         self.a_size = len_of_queue
         self.s_size = num_of_processes * len_of_queue + num_of_processes
         self.inbound_panel_blocks = inbound_panel_blocks
         self.inbound_panel_blocks_clone = self.inbound_panel_blocks[:]
+        self.event_tracer = pd.DataFrame(columns=["TIME", "EVENT", "PART", "PROCESS", "SERVER_ID"])
+        self.env, self.model = self._modeling(self.num_of_processes, self.event_tracer)
         self.queue = []
         self.time = 0.0
         self.num_of_blocks_put = 0
@@ -51,14 +50,14 @@ class Assembly(object):
         return next_state, reward, done
 
     def reset(self):
-        self.env, self.model = self._modeling(self.num_of_processes)
+        self.event_tracer = pd.DataFrame([], columns=["TIME", "EVENT", "PART", "PROCESS", "SERVER_ID"])
+        self.env, self.model = self._modeling(self.num_of_processes, self.event_tracer)
         self.inbound_panel_blocks = self.inbound_panel_blocks_clone[:]
         for panel_block in self.inbound_panel_blocks:
             panel_block.step = 0
         random.shuffle(self.inbound_panel_blocks)
         self.num_of_blocks_put = 0
         self.stage = 0
-        self.event_tracer = pd.DataFrame([], columns=self.columns)
         return self._get_state()
 
     def _get_state(self):
@@ -120,12 +119,12 @@ class Assembly(object):
 
         return process_throughput
 
-    def _modeling(self, num_of_processes):
+    def _modeling(self, num_of_processes, event_tracer):
         from environment.SimComponents import Process, Sink
         env = simpy.Environment()
         model = {}
         for i in range(num_of_processes + 1):
-            model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, self.event_tracer, qlimit=1)
+            model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, event_tracer, qlimit=1)
             if i == num_of_processes:
                 model['Sink'] = Sink(env, 'Sink')
 
