@@ -35,6 +35,7 @@ class Assembly(object):
         else:
             block = self.queue.pop(action)
             self.env.process(self.model['Process0'].put(block, 'Source', None, 0))
+            self.event_tracer.loc[len(self.event_tracer)] = [self.env.now, "part_transferred", block.id, "Source", None]
             self.num_of_blocks_put += 1
             while True:
                 self.env.step()
