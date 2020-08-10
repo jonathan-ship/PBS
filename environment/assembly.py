@@ -48,6 +48,8 @@ class Assembly(object):
             reward = self._calculate_reward()
             self.time = self.env.now
         next_state = self._get_state()
+        if done:
+            self.env.run()
         return next_state, reward, done
 
     def reset(self):

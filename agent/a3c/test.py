@@ -39,7 +39,7 @@ if __name__ == '__main__':
             s1, r, d = env.step(a)
 
             if d:
-                print("total_lead time")
+                print("total_lead time: {0}".format(env.model['Sink'].last_arrival))
                 break
 
             s = s1
