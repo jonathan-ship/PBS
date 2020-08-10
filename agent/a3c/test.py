@@ -33,8 +33,7 @@ if __name__ == '__main__':
 
         while True:
             a_dist, v = sess.run([network.policy, network.value], feed_dict={network.inputs: [s]})
-            a = np.random.choice(a_dist[0], p=a_dist[0])
-            a = np.argmax(a_dist == a)
+            a = np.argmax(a_dist[0])
 
             s1, r, d = env.step(a)
 

@@ -164,7 +164,6 @@ if __name__ == '__main__':
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    df_event_tracer = pd.DataFrame(assembly.event_tracer)
-    df_event_tracer.to_excel(save_path +'/event_PBS_rev.xlsx')
+    assembly.event_tracer.to_excel(save_path +'/event_PBS.xlsx')
 
 
