@@ -149,6 +149,9 @@ class SubProcess(object):
             if step == 0:
                 step += 1
 
+
+            if (self.part.id == "U611 L13C") and self.process_name == "HA031":
+                print("0")
             next_process = self.part.data[(self.part.step + step, 'process')]
             if self.process_dict[next_process].__class__.__name__ == 'Process':
                 yield self.env.process(self.process_dict[next_process].put(self.part, self.name, step))
