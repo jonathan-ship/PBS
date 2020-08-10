@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+from environment.SimComponents import Process, Sink
+
 
 def import_panel_block_schedule(filepath):
     df_schedule = pd.read_csv(filepath, encoding='euc-kr')
@@ -12,6 +14,10 @@ def import_panel_block_schedule(filepath):
         panel_blocks.append(panel_block)
     return panel_blocks, num_of_processes
 
+
+def export_panel_block_schedule(filepath, event_tracer):
+    block_list = event_tracer["PART"][
+        (event_tracer["EVENT"] == "part_transferred") & (event_tracer["PROCESS"] == "Source")]
 
 class PanelBlock(object):
     def __init__(self, block_id, block_working_time):

@@ -11,15 +11,14 @@ random.seed(42)
 
 class Assembly(object):
     def __init__(self, num_of_processes, len_of_queue, inbound_panel_blocks=None, display_env=False):
-        self.columns = ["TIME", "EVENT", "PART", "PROCESS"]
-        self.event_tracer = pd.DataFrame(columns=self.columns)
-        self.env, self.model = self._modeling(num_of_processes)
         self.num_of_processes = num_of_processes
         self.len_of_queue = len_of_queue
         self.a_size = len_of_queue
         self.s_size = num_of_processes * len_of_queue + num_of_processes
         self.inbound_panel_blocks = inbound_panel_blocks
         self.inbound_panel_blocks_clone = self.inbound_panel_blocks[:]
+        self.event_tracer = pd.DataFrame(columns=["TIME", "EVENT", "PART", "PROCESS", "SERVER_ID"])
+        self.env, self.model = self._modeling(self.num_of_processes, self.event_tracer)
         self.queue = []
         self.time = 0.0
         self.num_of_blocks_put = 0
@@ -35,7 +34,8 @@ class Assembly(object):
             reward = -1
         else:
             block = self.queue.pop(action)
-            self.env.process(self.model['Process0'].put(block, 'Source', 0))
+            self.env.process(self.model['Process0'].put(block, 'Source', None, 0))
+            self.event_tracer.loc[len(self.event_tracer)] = [self.env.now, "part_transferred", block.id, "Source", None]
             self.num_of_blocks_put += 1
             while True:
                 self.env.step()
@@ -48,17 +48,19 @@ class Assembly(object):
             reward = self._calculate_reward()
             self.time = self.env.now
         next_state = self._get_state()
+        if done:
+            self.env.run()
         return next_state, reward, done
 
     def reset(self):
-        self.env, self.model = self._modeling(self.num_of_processes)
+        self.event_tracer = pd.DataFrame([], columns=["TIME", "EVENT", "PART", "PROCESS", "SERVER_ID"])
+        self.env, self.model = self._modeling(self.num_of_processes, self.event_tracer)
         self.inbound_panel_blocks = self.inbound_panel_blocks_clone[:]
         for panel_block in self.inbound_panel_blocks:
             panel_block.step = 0
         random.shuffle(self.inbound_panel_blocks)
         self.num_of_blocks_put = 0
         self.stage = 0
-        self.event_tracer = pd.DataFrame([], columns=self.columns)
         return self._get_state()
 
     def _get_state(self):
@@ -98,13 +100,17 @@ class Assembly(object):
 
     def _calculate_reward(self):
         block_completed = self.event_tracer[
-            (self.event_tracer['TIME'] > self.time) & (self.event_tracer["EVENT"] == "completed")]
+            (self.event_tracer['TIME'] > self.time) &
+            (self.event_tracer["EVENT"] == "part_transferred") &
+            (self.event_tracer["PROCESS"] == 'Process{0}'.format(self.num_of_processes - 1))]
         num_of_block_completed = len(block_completed)
         return num_of_block_completed
 
     def _calculate_reward_by_throughput(self):
         # throughput
-        df_TH = self.event_tracer["TIME"][self.event_tracer["EVENT"] == "completed"]
+        df_TH = self.event_tracer["TIME"][
+            (self.event_tracer["EVENT"] == "part_transferred") &
+            (self.event_tracer["PROCESS"] == 'Process{0}'.format(self.num_of_processes - 1))]
         df_TH = df_TH.reset_index(drop=True)
 
         TH_list = []
@@ -116,14 +122,14 @@ class Assembly(object):
 
         return process_throughput
 
-    def _modeling(self, num_of_processes):
+    def _modeling(self, num_of_processes, event_tracer):
         from environment.SimComponents import Process, Sink
         env = simpy.Environment()
         model = {}
         for i in range(num_of_processes + 1):
-            model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, self.event_tracer, qlimit=1)
+            model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, event_tracer, qlimit=1)
             if i == num_of_processes:
-                model['Sink'] = Sink(env, 'Sink', self.event_tracer)
+                model['Sink'] = Sink(env, 'Sink')
 
         return env, model
 
