@@ -11,7 +11,7 @@ random.seed(42)
 
 class Assembly(object):
     def __init__(self, num_of_processes, len_of_queue, inbound_panel_blocks=None, display_env=False):
-        self.columns = ["TIME", "EVENT", "PART", "PROCESS", "SERVER_ID"]
+        self.columns = ["TIME", "EVENT", "PART", "PROCESS"]
         self.event_tracer = pd.DataFrame(columns=self.columns)
         self.env, self.model = self._modeling(num_of_processes)
         self.num_of_processes = num_of_processes
@@ -35,7 +35,7 @@ class Assembly(object):
             reward = -1
         else:
             block = self.queue.pop(action)
-            self.env.process(self.model['Process0'].put(block, 'Source', None, 0))
+            self.env.process(self.model['Process0'].put(block, 'Source', 0))
             self.num_of_blocks_put += 1
             while True:
                 self.env.step()
@@ -98,17 +98,13 @@ class Assembly(object):
 
     def _calculate_reward(self):
         block_completed = self.event_tracer[
-            (self.event_tracer['TIME'] > self.time) &
-            (self.event_tracer["EVENT"] == "part_transferred") &
-            (self.event_tracer["PROCESS"] == 'Process{0}'.format(self.num_of_processes - 1))]
+            (self.event_tracer['TIME'] > self.time) & (self.event_tracer["EVENT"] == "completed")]
         num_of_block_completed = len(block_completed)
         return num_of_block_completed
 
     def _calculate_reward_by_throughput(self):
         # throughput
-        df_TH = self.event_tracer["TIME"][
-            (self.event_tracer["EVENT"] == "part_transferred") &
-            (self.event_tracer["PROCESS"] == 'Process{0}'.format(self.num_of_processes - 1))]
+        df_TH = self.event_tracer["TIME"][self.event_tracer["EVENT"] == "completed"]
         df_TH = df_TH.reset_index(drop=True)
 
         TH_list = []
@@ -127,7 +123,7 @@ class Assembly(object):
         for i in range(num_of_processes + 1):
             model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, self.event_tracer, qlimit=1)
             if i == num_of_processes:
-                model['Sink'] = Sink(env, 'Sink')
+                model['Sink'] = Sink(env, 'Sink', self.event_tracer)
 
         return env, model
 
