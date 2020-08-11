@@ -6,8 +6,6 @@ import os
 
 import numpy as np
 
-random.seed(42)
-
 
 class Assembly(object):
     def __init__(self, num_of_processes, len_of_queue, inbound_panel_blocks=None, display_env=False):
