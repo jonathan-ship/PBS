@@ -102,6 +102,12 @@ class Assembly(object):
         num_of_block_completed = len(block_completed)
         return num_of_block_completed
 
+    def _calculate_reward_by_delay(self):
+        delay_start = self.event_tracer[
+            (self.event_tracer['TIME'] > self.time) & (self.event_tracer["EVENT"] == "delay_start")]
+        num_of_delay_start = len(delay_start)
+        return - num_of_delay_start
+
     def _calculate_reward_by_throughput(self):
         # throughput
         df_TH = self.event_tracer["TIME"][self.event_tracer["EVENT"] == "completed"]
