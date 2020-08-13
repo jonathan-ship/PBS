@@ -6,8 +6,6 @@ import os
 
 import numpy as np
 
-random.seed(42)
-
 
 class Assembly(object):
     def __init__(self, num_of_processes, len_of_queue, inbound_panel_blocks=None, display_env=False):
@@ -103,6 +101,12 @@ class Assembly(object):
             (self.event_tracer['TIME'] > self.time) & (self.event_tracer["EVENT"] == "completed")]
         num_of_block_completed = len(block_completed)
         return num_of_block_completed
+
+    def _calculate_reward_by_delay(self):
+        delay_start = self.event_tracer[
+            (self.event_tracer['TIME'] > self.time) & (self.event_tracer["EVENT"] == "delay_start")]
+        num_of_delay_start = len(delay_start)
+        return - num_of_delay_start
 
     def _calculate_reward_by_throughput(self):
         # throughput

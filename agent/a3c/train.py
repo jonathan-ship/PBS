@@ -1,6 +1,7 @@
 import threading
 import multiprocessing
 import os
+import numpy as np
 import tensorflow as tf
 import scipy.signal
 
@@ -38,6 +39,7 @@ class Worker():
         self.trainer = trainer
         self.global_episodes = global_episodes
         self.increment = self.global_episodes.assign_add(1)
+        self.lead_time = []
         self.episode_rewards = []
         self.episode_lengths = []
         self.episode_mean_values = []
@@ -124,6 +126,7 @@ class Worker():
                         if d:
                             break
 
+                    self.lead_time.append(self.env.model['Sink'].last_arrival)
                     self.episode_rewards.append(episode_reward)
                     self.episode_lengths.append(episode_step_count)
                     self.episode_mean_values.append(np.mean(episode_values))
@@ -138,10 +141,12 @@ class Worker():
                             saver.save(sess, self.model_path + '/model-' + str(episode_count) + '.cptk')
                             print("Saved Model at episode %d" % episode_count)
 
+                        mean_lead_time = np.mean(self.lead_time[-5:])
                         mean_reward = np.mean(self.episode_rewards[-5:])
                         mean_length = np.mean(self.episode_lengths[-5:])
                         mean_value = np.mean(self.episode_mean_values[-5:])
                         summary = tf.Summary()
+                        summary.value.add(tag='Perf/Lead Time', simple_value=float(mean_lead_time))
                         summary.value.add(tag='Perf/Reward', simple_value=float(mean_reward))
                         summary.value.add(tag='Perf/Length', simple_value=float(mean_length))
                         summary.value.add(tag='Perf/Value', simple_value=float(mean_value))
@@ -163,7 +168,7 @@ if __name__ == '__main__':
 
     max_episode_length = 10000
     max_episode = 10000
-    gamma = 0.99  # discount rate for advantage estimation and reward discounting
+    gamma = 0.9  # discount rate for advantage estimation and reward discounting
 
     len_of_queue = 10
     s_size = num_of_processes * len_of_queue + num_of_processes
