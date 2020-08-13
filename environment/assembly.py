@@ -119,13 +119,14 @@ class Assembly(object):
         return process_throughput
 
     def _modeling(self, num_of_processes, event_tracer):
-        from environment.SimComponents import Process, Sink
+        from environment.SimComponents import Process, Sink, Monitor
         env = simpy.Environment()
         model = {}
+        Monitor = Monitor('event_PBS', 61)
         for i in range(num_of_processes + 1):
-            model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, event_tracer, qlimit=1)
+            model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, Monitor, qlimit=1)
             if i == num_of_processes:
-                model['Sink'] = Sink(env, 'Sink', self.event_tracer)
+                model['Sink'] = Sink(env, 'Sink', Monitor)
 
         return env, model
 
