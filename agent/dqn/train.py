@@ -177,7 +177,11 @@ if __name__ == "__main__":
 
     load_model = False
 
-    assembly = Assembly(num_of_processes, len_of_queue, inbound_panel_blocks=panel_blocks)
+    event_path = '../../environment/simulation_result'
+    if not os.path.exists(event_path):
+        os.makedirs(event_path)
+
+    assembly = Assembly(num_of_processes, len_of_queue, event_path + '/event_PBS.csv', inbound_panel_blocks=panel_blocks)
     agent = DQNAgent(assembly, state_size, action_size, num_episode)
 
     agent.run()

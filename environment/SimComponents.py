@@ -214,7 +214,7 @@ class Routing(object):
 
 
 class Monitor(object):
-    def __init__(self, filename, data_len):
+    def __init__(self, filename):
         self.filename = filename
         with open(self.filename, 'w', encoding='utf-8') as f:
             f.write('TIME,EVENT,PART,PROCESS')

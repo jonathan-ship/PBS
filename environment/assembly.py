@@ -8,20 +8,19 @@ import numpy as np
 
 
 class Assembly(object):
-    def __init__(self, num_of_processes, len_of_queue, inbound_panel_blocks=None, display_env=False):
+    def __init__(self, num_of_processes, len_of_queue, event_path, inbound_panel_blocks=None, display_env=False):
         self.num_of_processes = num_of_processes
         self.len_of_queue = len_of_queue
-        self.a_size = len_of_queue
-        self.s_size = num_of_processes * len_of_queue + num_of_processes
+        self.event_path = event_path
         self.inbound_panel_blocks = inbound_panel_blocks
         self.inbound_panel_blocks_clone = self.inbound_panel_blocks[:]
-        self.event_tracer = pd.DataFrame(columns=["TIME", "EVENT", "PART", "PROCESS"])
-        self.env, self.model = self._modeling(self.num_of_processes, self.event_tracer)
+        self.a_size = len_of_queue
+        self.s_size = num_of_processes * len_of_queue + num_of_processes
+        self.env, self.model, self.monitor = self._modeling(self.num_of_processes, self.event_path)
         self.queue = []
         self.time = 0.0
         self.num_of_blocks_put = 0
         self.stage = 0
-        self.empty = -1.0
         if display_env:
             display = AssemblyDisplay()
             display.game_loop_from_space()
@@ -33,7 +32,8 @@ class Assembly(object):
         else:
             block = self.queue.pop(action)
             self.env.process(self.model['Process0'].put(block, 'Source', 0))
-            self.event_tracer.loc[len(self.event_tracer)] = [self.env.now, "part_transferred", block.id, "Source"]
+            self.monitor.record(self.env.now, "part_created", block.id, "Source")
+            self.monitor.record(self.env.now, "part_transferred", block.id, "Source")
             self.num_of_blocks_put += 1
             while True:
                 self.env.step()
@@ -51,8 +51,7 @@ class Assembly(object):
         return next_state, reward, done
 
     def reset(self):
-        self.event_tracer = pd.DataFrame([], columns=["TIME", "EVENT", "PART", "PROCESS"])
-        self.env, self.model = self._modeling(self.num_of_processes, self.event_tracer)
+        self.env, self.model, self.monitor = self._modeling(self.num_of_processes, self.event_path)
         self.inbound_panel_blocks = self.inbound_panel_blocks_clone[:]
         for panel_block in self.inbound_panel_blocks:
             panel_block.step = 0
@@ -63,7 +62,7 @@ class Assembly(object):
 
     def _get_state(self):
         # 전체 state 변수를 -1로 초기화
-        state = np.full(self.s_size, self.empty)
+        state = np.full(self.s_size, -1.0)
 
         # queue에 블록을 할당
         if len(self.inbound_panel_blocks) > 0 and len(self.queue) < self.len_of_queue:
@@ -97,42 +96,28 @@ class Assembly(object):
         return state
 
     def _calculate_reward(self):
-        block_completed = self.event_tracer[
-            (self.event_tracer['TIME'] > self.time) & (self.event_tracer["EVENT"] == "completed")]
+        event_tracer = pd.read_csv(self.event_path)
+        block_completed = event_tracer[(event_tracer['TIME'] > self.time) & (event_tracer["EVENT"] == "completed")]
         num_of_block_completed = len(block_completed)
         return num_of_block_completed
 
     def _calculate_reward_by_delay(self):
-        delay_start = self.event_tracer[
-            (self.event_tracer['TIME'] > self.time) & (self.event_tracer["EVENT"] == "delay_start")]
+        event_tracer = pd.read_csv(self.event_path)
+        delay_start = event_tracer[(event_tracer['TIME'] > self.time) & (event_tracer["EVENT"] == "delay_start")]
         num_of_delay_start = len(delay_start)
         return - num_of_delay_start
 
-    def _calculate_reward_by_throughput(self):
-        # throughput
-        df_TH = self.event_tracer["TIME"][self.event_tracer["EVENT"] == "completed"]
-        df_TH = df_TH.reset_index(drop=True)
-
-        TH_list = []
-        process_throughput = 0
-        for i in range(len(df_TH) - 1):
-            TH_list.append(df_TH.loc[i + 1] - df_TH.loc[i])
-        if not TH_list:
-            process_throughput = 1 / np.mean(TH_list)
-
-        return process_throughput
-
-    def _modeling(self, num_of_processes, event_tracer):
+    def _modeling(self, num_of_processes, event_path):
         from environment.SimComponents import Process, Sink, Monitor
         env = simpy.Environment()
         model = {}
-        Monitor = Monitor('.result/event_PBS.csv', 61)
+        monitor = Monitor(event_path)
         for i in range(num_of_processes + 1):
-            model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, Monitor, qlimit=1)
+            model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, monitor, qlimit=1)
             if i == num_of_processes:
                 model['Sink'] = Sink(env, 'Sink', Monitor)
 
-        return env, model
+        return env, model, monitor
 
 
 class AssemblyDisplay(object):
@@ -147,7 +132,10 @@ if __name__ == '__main__':
     from environment.panelblock import *
     panel_blocks, num_of_processes = import_panel_block_schedule('../environment/data/PBS_assy_sequence_gen_000.csv')
     len_of_queue = 10
-    assembly = Assembly(num_of_processes, len_of_queue, inbound_panel_blocks=panel_blocks)
+    event_path = './simulation_result'
+    if not os.path.exists(event_path):
+        os.makedirs(event_path)
+    assembly = Assembly(num_of_processes, len_of_queue, event_path + '/event_PBS.csv', inbound_panel_blocks=panel_blocks)
     s = assembly.reset()
     t = 0
     r_cum = 0
@@ -163,12 +151,3 @@ if __name__ == '__main__':
             break
 
     print(assembly.env.now)
-
-    # save data
-    save_path = './result'
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-
-    assembly.event_tracer.to_excel(save_path +'/event_PBS.xlsx')
-
-
