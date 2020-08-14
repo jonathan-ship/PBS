@@ -126,7 +126,7 @@ class Assembly(object):
         from environment.SimComponents import Process, Sink, Monitor
         env = simpy.Environment()
         model = {}
-        Monitor = Monitor('event_PBS', 61)
+        Monitor = Monitor('.result/event_PBS.csv', 61)
         for i in range(num_of_processes + 1):
             model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, Monitor, qlimit=1)
             if i == num_of_processes:

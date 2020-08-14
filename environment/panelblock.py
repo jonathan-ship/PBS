@@ -1,7 +1,4 @@
 import pandas as pd
-import os
-
-from environment.SimComponents import Process, Sink
 
 
 def import_panel_block_schedule(filepath):
@@ -18,8 +15,6 @@ def import_panel_block_schedule(filepath):
 def export_panel_block_schedule(filepath, event_tracer):
     block_list = event_tracer["PART"][
         (event_tracer["EVENT"] == "part_transferred") & (event_tracer["PROCESS"] == "Source")]
-
-
     df_block_list = pd.DataFrame(block_list, columns=["RL results"])
     df_block_list.to_excel(filepath + '/results_PBS.xlsx')
 
