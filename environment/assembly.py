@@ -6,7 +6,6 @@ import os
 
 import numpy as np
 
-random.seed(42)
 
 class Assembly(object):
     def __init__(self, num_of_processes, len_of_queue, event_path, inbound_panel_blocks=None, display_env=False):
@@ -104,7 +103,10 @@ class Assembly(object):
         time_between = block_completed['TIME'].diff()
         time_between = time_between[idx].dropna()
         for i in time_between:
-            reward += 1 / i
+            if i == 0.0:
+                reward += 10
+            else:
+                reward += 10 / i
         return reward
 
     def _calculate_reward_by_complete_blocks(self):

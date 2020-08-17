@@ -177,6 +177,7 @@ if __name__ == '__main__':
     load_model = False
     model_path = '../../model/a3c/queue-%d' % a_size
     summary_path = '../../summary/a3c/queue-%d' % a_size
+    event_path = '../../environment/simulation_result'
 
     tf.reset_default_graph()
 
@@ -185,6 +186,9 @@ if __name__ == '__main__':
 
     if not os.path.exists(summary_path):
         os.makedirs(summary_path)
+
+    if not os.path.exists(event_path):
+        os.makedirs(event_path)
 
     with tf.device("/cpu:0"):
         global_episodes = tf.Variable(0, dtype=tf.int32, name='global_episodes', trainable=False)
@@ -196,7 +200,7 @@ if __name__ == '__main__':
             num_workers = 8
         # Create worker classes
         for i in range(1):
-            assembly = Assembly(num_of_processes, len_of_queue, inbound_panel_blocks=panel_blocks)
+            assembly = Assembly(num_of_processes, len_of_queue, event_path + '/event_PBS.csv', inbound_panel_blocks=panel_blocks)
             workers.append(Worker(assembly, i, s_size, a_size, trainer, model_path, summary_path, global_episodes))
         saver = tf.train.Saver(max_to_keep=5)
 
