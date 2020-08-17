@@ -6,6 +6,7 @@ import os
 
 import numpy as np
 
+random.seed(42)
 
 class Assembly(object):
     def __init__(self, num_of_processes, len_of_queue, event_path, inbound_panel_blocks=None, display_env=False):
@@ -31,9 +32,9 @@ class Assembly(object):
             reward = -1
         else:
             block = self.queue.pop(action)
+            self.monitor.record(self.env.now, "Source", part_id=block.id, event="part_created")
             self.env.process(self.model['Process0'].put(block, 'Source', 0))
-            self.monitor.record(self.env.now, "part_created", block.id, "Source")
-            self.monitor.record(self.env.now, "part_transferred", block.id, "Source")
+            self.monitor.record(self.env.now, "Source", part_id=block.id, event="part_transferred")
             self.num_of_blocks_put += 1
             while True:
                 self.env.step()
@@ -96,6 +97,17 @@ class Assembly(object):
         return state
 
     def _calculate_reward(self):
+        reward = 0
+        event_tracer = pd.read_csv(self.event_path)
+        block_completed = event_tracer[event_tracer["EVENT"] == "completed"]
+        idx = block_completed['TIME'] > self.time
+        time_between = block_completed['TIME'].diff()
+        time_between = time_between[idx].dropna()
+        for i in time_between:
+            reward += 1 / i
+        return reward
+
+    def _calculate_reward_by_complete_blocks(self):
         event_tracer = pd.read_csv(self.event_path)
         block_completed = event_tracer[(event_tracer['TIME'] > self.time) & (event_tracer["EVENT"] == "completed")]
         num_of_block_completed = len(block_completed)
@@ -115,8 +127,7 @@ class Assembly(object):
         for i in range(num_of_processes + 1):
             model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, monitor, qlimit=1)
             if i == num_of_processes:
-                model['Sink'] = Sink(env, 'Sink', Monitor)
-
+                model['Sink'] = Sink(env, 'Sink', monitor)
         return env, model, monitor
 
 
