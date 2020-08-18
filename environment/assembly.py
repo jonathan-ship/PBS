@@ -50,12 +50,14 @@ class Assembly(object):
             reward += 1000 / self.model['Sink'].last_arrival
         return next_state, reward, done
 
-    def reset(self):
+    def reset(self, e):
         self.env, self.model, self.monitor = self._modeling(self.num_of_processes, self.event_path)
         self.inbound_panel_blocks = self.inbound_panel_blocks_clone[:]
         for panel_block in self.inbound_panel_blocks:
             panel_block.step = 0
-        random.shuffle(self.inbound_panel_blocks)
+        if e % 30 == 0:
+            random.shuffle(self.inbound_panel_blocks)
+            self.inbound_panel_blocks_clone = self.inbound_panel_blocks[:]
         self.num_of_blocks_put = 0
         self.stage = 0
         return self._get_state()

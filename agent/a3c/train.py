@@ -84,6 +84,7 @@ class Worker():
     def work(self, max_episode_length, max_episode, gamma, sess, coord, saver):
             episode_count = sess.run(self.global_episodes)
             total_steps = 0
+            e = 1
             print("Starting worker " + str(self.number))
             with sess.as_default(), sess.graph.as_default():
                 while not coord.should_stop() and episode_count < max_episode:
@@ -94,7 +95,7 @@ class Worker():
                     episode_step_count = 0
                     d = False
 
-                    s = self.env.reset()
+                    s = self.env.reset(e)
                     while True:
                         # Take an action using probabilities from policy network output.
                         a_dist, v = sess.run(
@@ -115,7 +116,7 @@ class Worker():
 
                         # If the episode hasn't ended, but the experience buffer is full, then we
                         # make an update step using that experience rollout.
-                        if len(episode_buffer) == 10 and d != True and episode_step_count != max_episode_length - 1:
+                        if len(episode_buffer) == 30 and d != True and episode_step_count != max_episode_length - 1:
                             # Since we don't know what the true final return is, we "bootstrap" from our current
                             # value estimation.
                             v1 = sess.run(self.local_AC.value,
@@ -161,6 +162,7 @@ class Worker():
                     if self.name == 'worker_0':
                         sess.run(self.increment)
                     episode_count += 1
+                    e += 1
 
 
 if __name__ == '__main__':
@@ -168,7 +170,7 @@ if __name__ == '__main__':
 
     max_episode_length = 10000
     max_episode = 10000
-    gamma = 0.9  # discount rate for advantage estimation and reward discounting
+    gamma = 1.0  # discount rate for advantage estimation and reward discounting
 
     len_of_queue = 10
     s_size = num_of_processes * len_of_queue + num_of_processes
