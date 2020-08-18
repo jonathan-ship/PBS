@@ -27,8 +27,9 @@ class Assembly(object):
 
     def step(self, action):
         done = False
-        reward = 0
-        if action < len(self.queue):
+        if action >= len(self.queue):
+            reward = -1
+        else:
             block = self.queue.pop(action)
             self.monitor.record(self.env.now, "Source", part_id=block.id, event="part_created")
             self.env.process(self.model['Process0'].put(block, 'Source', 0))
@@ -42,12 +43,11 @@ class Assembly(object):
                     break
             if len(self.queue) == 0:
                 done = True
-            # reward = self._calculate_reward()
+            reward = self._calculate_reward()
             self.time = self.env.now
         next_state = self._get_state()
         if done:
             self.env.run()
-            reward += 1000 / self.model['Sink'].last_arrival
         return next_state, reward, done
 
     def reset(self):
