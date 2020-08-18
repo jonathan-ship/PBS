@@ -84,7 +84,6 @@ class Worker():
     def work(self, max_episode_length, max_episode, gamma, sess, coord, saver):
             episode_count = sess.run(self.global_episodes)
             total_steps = 0
-            e = 1
             print("Starting worker " + str(self.number))
             with sess.as_default(), sess.graph.as_default():
                 while not coord.should_stop() and episode_count < max_episode:
@@ -95,7 +94,7 @@ class Worker():
                     episode_step_count = 0
                     d = False
 
-                    s = self.env.reset(e)
+                    s = self.env.reset()
                     while True:
                         # Take an action using probabilities from policy network output.
                         a_dist, v = sess.run(
@@ -162,7 +161,6 @@ class Worker():
                     if self.name == 'worker_0':
                         sess.run(self.increment)
                     episode_count += 1
-                    e += 1
 
 
 if __name__ == '__main__':
