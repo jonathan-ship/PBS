@@ -95,7 +95,7 @@ class Assembly(object):
 
         return state
 
-    def _calculate_reward_by_lead_time(self):
+    def _calculate_reward(self):
         reward = 0
         event_tracer = pd.read_csv(self.event_path)
         block_completed = event_tracer[(event_tracer["EVENT"] == "completed")

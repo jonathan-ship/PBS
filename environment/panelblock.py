@@ -4,12 +4,12 @@ import pandas as pd
 def import_panel_block_schedule(filepath):
     df_schedule = pd.read_csv(filepath, encoding='euc-kr')
     df_schedule = df_schedule.drop(columns=['unit_assy'])
-    num_of_processes = len(df_schedule.columns) - 1
+    #num_of_processes = len(df_schedule.columns) - 1
     panel_blocks = []
     for i, block in df_schedule.iterrows():
         panel_block = PanelBlock(block['product'], block.drop(['product']))
         panel_blocks.append(panel_block)
-    return panel_blocks, num_of_processes
+    return panel_blocks
 
 
 def export_panel_block_schedule(filepath, event_tracer):

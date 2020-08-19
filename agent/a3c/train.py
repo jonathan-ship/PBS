@@ -164,13 +164,13 @@ class Worker():
 
 
 if __name__ == '__main__':
-    panel_blocks, num_of_processes = import_panel_block_schedule('../../environment/data/PBS_assy_sequence_gen_000.csv')
 
     max_episode_length = 10000
     max_episode = 10000
     gamma = 1.0  # discount rate for advantage estimation and reward discounting
 
     len_of_queue = 10
+    num_of_processes = 7
     s_size = num_of_processes * len_of_queue + num_of_processes
     a_size = len_of_queue
 
@@ -200,6 +200,7 @@ if __name__ == '__main__':
             num_workers = 8
         # Create worker classes
         for i in range(1):
+            panel_blocks = import_panel_block_schedule('../../environment/data/PBS_assy_sequence_gen_000.csv')
             assembly = Assembly(num_of_processes, len_of_queue, event_path + '/event_PBS.csv', inbound_panel_blocks=panel_blocks)
             workers.append(Worker(assembly, i, s_size, a_size, trainer, model_path, summary_path, global_episodes))
         saver = tf.train.Saver(max_to_keep=5)

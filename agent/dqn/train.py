@@ -99,7 +99,7 @@ class DQNAgent:
 
         states = np.array([sample[0][0] for sample in mini_batch])
         actions = np.array([sample[1] for sample in mini_batch])
-        rewards = np.array(sample[2] for sample in mini_batch)
+        rewards = np.array([sample[2] for sample in mini_batch])
         next_states = np.array([sample[3][0] for sample in mini_batch])
         dones = np.array([sample[4] for sample in mini_batch])
 
