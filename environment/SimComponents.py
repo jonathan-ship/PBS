@@ -91,6 +91,8 @@ class Process(object):
             self.server[self.server_idx].waiting.append(self.env.event())
             # record: delay_start
             self.Monitor.record(self.env.now, process_from, part_id=part.id, event="delay_start")
+            if (part.id == "U611 L12C") & (process_from == "HA011_0"):
+                print("1")
 
             yield self.server[self.server_idx].waiting[-1]
             # record: delay_finish
@@ -151,12 +153,12 @@ class SubProcess(object):
             # record: work_finish
             self.Monitor.record(self.env.now, self.name, part_id=self.part.id, event="work_finish")
 
-            step = 1
-            while not self.part.data[(self.part.step + step, 'process_time')]:
-                if self.part.data[(self.part.step + step, 'process')] != 'Sink':
-                    step += 1
-                else:
-                    break
+            step = 0
+            while (self.part.data[(self.part.step + step + 1, 'process_time')] == 0) \
+                    and (self.part.data[(self.part.step + step + 1, 'process')] != 'Sink'):
+                step += 1
+            if step == 0:
+                step += 1
 
             next_process = self.part.data[(self.part.step + step, 'process')]
 
@@ -204,17 +206,21 @@ class Routing(object):
 
     def most_unutilized(self):
         from environment.postprocessing import Utilization
+        import random
+
         utilization_list = []
         for i in range(self.server_num):
             utilization = Utilization(self.event_tracer, self.process.process_dict, self.server[i].name)
-            server_utilization = utilization.utilization()
+            server_utilization, _, _ = utilization.utilization()
             utilization_list.append(server_utilization)
-        idx_min = np.argmin(utilization_list)
+        idx_min_list = np.argwhere(utilization_list == np.min(utilization_list))
+        idx_min_list = idx_min_list.flatten().tolist()
+        idx_min = random.choice(idx_min_list)
         return idx_min
 
 
 class Monitor(object):
-    def __init__(self, filename):
+    def __init__(self, filename, data_len):
         self.filename = filename
         with open(self.filename, 'w', encoding='utf-8') as f:
             f.write('TIME,EVENT,PART,PROCESS')
