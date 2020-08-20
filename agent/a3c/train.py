@@ -100,7 +100,8 @@ class Worker():
                         a_dist, v = sess.run(
                             [self.local_AC.policy, self.local_AC.value],
                             feed_dict={self.local_AC.inputs: [s]})
-                        a = np.random.choice(a_dist[0], p=a_dist[0])
+                        a_dist = a_dist[0, :len(self.env.queue)]
+                        a = np.random.choice(a_dist, p=a_dist)
                         a = np.argmax(a_dist == a)
 
                         s1, r, d = self.env.step(a)
