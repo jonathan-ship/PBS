@@ -45,7 +45,7 @@ class Assembly(object):
                     break
             if len(self.queue) == 0:
                 done = True
-            reward = self._calculate_reward_by_lead_time()
+            reward = self._calculate_reward_by_TH()
             self.time = self.env.now
         next_state = self._get_state()
         if done:
@@ -64,7 +64,7 @@ class Assembly(object):
 
     def _get_state(self):
         # 전체 state 변수를 -1로 초기화
-        state = np.full(self.s_size, -1.0)
+        state = np.full(self.s_size, 0.0)
 
         # queue에 블록을 할당
         if len(self.inbound_panel_blocks) > 0 and len(self.queue) < self.len_of_queue:
@@ -97,6 +97,13 @@ class Assembly(object):
 
         return state
 
+    def _calculate_reward_by_TH(self):
+        event_tracer = pd.read_csv(self.event_path)
+        block_completed = event_tracer[event_tracer["EVENT"] == "completed"]
+        num_of_block_completed = len(block_completed)
+        throughput = num_of_block_completed / self.env.now
+        return throughput
+
     def _calculate_reward_by_lead_time(self):
         reward = 0
         event_tracer = pd.read_csv(self.event_path)
@@ -120,7 +127,7 @@ class Assembly(object):
         num_of_block_completed = len(block_completed)
         return num_of_block_completed
 
-    def _calculate_reward_by_delay(self):
+    def _calculate_reward_by_delay_number(self):
         event_tracer = pd.read_csv(self.event_path)
         delay_start = event_tracer[(event_tracer['TIME'] > self.time) & (event_tracer["EVENT"] == "delay_start")]
         num_of_delay_start = len(delay_start)
