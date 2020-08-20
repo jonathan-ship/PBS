@@ -6,6 +6,8 @@ import os
 
 import numpy as np
 
+from environment.postprocessing import Utilization
+
 
 class Assembly(object):
     def __init__(self, num_of_processes, len_of_queue, event_path, inbound_panel_blocks=None, display_env=False):
@@ -95,7 +97,10 @@ class Assembly(object):
 
         return state
 
-    def _calculate_reward(self):
+    def _calculate_reward_by_utilization(self):
+        pass
+
+    def _calculate_reward_by_lead_time(self):
         reward = 0
         event_tracer = pd.read_csv(self.event_path)
         block_completed = event_tracer[(event_tracer["EVENT"] == "completed")

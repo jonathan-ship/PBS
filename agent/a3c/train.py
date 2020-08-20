@@ -199,9 +199,10 @@ if __name__ == '__main__':
         if num_workers > 8:
             num_workers = 8
         # Create worker classes
-        for i in range(1):
+        for i in range(num_workers):
             panel_blocks = import_panel_block_schedule('../../environment/data/PBS_assy_sequence_gen_000.csv')
-            assembly = Assembly(num_of_processes, len_of_queue, event_path + '/event_PBS.csv', inbound_panel_blocks=panel_blocks)
+            assembly = Assembly(num_of_processes, len_of_queue, event_path + '/event_PBS_train{0}.csv'.format(i),
+                                inbound_panel_blocks=panel_blocks)
             workers.append(Worker(assembly, i, s_size, a_size, trainer, model_path, summary_path, global_episodes))
         saver = tf.train.Saver(max_to_keep=5)
 
