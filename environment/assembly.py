@@ -80,7 +80,7 @@ class Assembly(object):
             process = self.model['Process{0}'.format(i)]  # modeling한 Process
             for server in process.server:
                 if not server.part:
-                    remaining_working_time.append(-1)
+                    remaining_working_time.append(0.0)
                     continue
                 part_id, working_time = server.part.id, server.part.data[(server.part.step, 'process_time')]
                 part_start_time = server.working_start
@@ -102,7 +102,7 @@ class Assembly(object):
         block_completed = event_tracer[event_tracer["EVENT"] == "completed"]
         num_of_block_completed = len(block_completed)
         throughput = num_of_block_completed / self.env.now
-        return throughput
+        return throughput * 10
 
     def _calculate_reward_by_lead_time(self):
         reward = 0
