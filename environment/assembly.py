@@ -45,7 +45,7 @@ class Assembly(object):
                     break
             if len(self.queue) == 0:
                 done = True
-            reward = self._calculate_reward()
+            reward = self._calculate_reward_by_lead_time()
             self.time = self.env.now
         next_state = self._get_state()
         if done:
@@ -97,9 +97,6 @@ class Assembly(object):
 
         return state
 
-    def _calculate_reward_by_utilization(self):
-        pass
-
     def _calculate_reward_by_lead_time(self):
         reward = 0
         event_tracer = pd.read_csv(self.event_path)
@@ -108,10 +105,13 @@ class Assembly(object):
         block_completed = block_completed.reset_index(drop=True)
         block_created = event_tracer[event_tracer["EVENT"] == "part_created"]
         for i, row in block_completed.iterrows():
-            start = block_created["TIME"][block_created["PART"] == row["PART"]]
-            start = start.tolist()[0]
+            start = (block_created["TIME"][block_created["PART"] == row["PART"]]).tolist()[0]
             finish = row["TIME"]
-            reward += 100 / (finish - start)
+            lead_time = finish - start
+            block = event_tracer[(event_tracer['PART'] == row['PART']) &
+                                 ((event_tracer["EVENT"] == "work_start") | (event_tracer["EVENT"] == "work_finish"))]
+            total_working_time = sum(block["TIME"].groupby(block["PROCESS"]).diff().dropna())
+            reward += (total_working_time - lead_time)
         return reward
 
     def _calculate_reward_by_complete_blocks(self):
@@ -148,7 +148,8 @@ class AssemblyDisplay(object):
 
 if __name__ == '__main__':
     from environment.panelblock import *
-    panel_blocks, num_of_processes = import_panel_block_schedule('../environment/data/PBS_assy_sequence_gen_000.csv')
+    panel_blocks = import_panel_block_schedule('../environment/data/PBS_assy_sequence_gen_000.csv')
+    num_of_processes = 7
     len_of_queue = 10
     event_path = './simulation_result'
     if not os.path.exists(event_path):

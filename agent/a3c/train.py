@@ -101,6 +101,7 @@ class Worker():
                             [self.local_AC.policy, self.local_AC.value],
                             feed_dict={self.local_AC.inputs: [s]})
                         a_dist = a_dist[0, :len(self.env.queue)]
+                        a_dist = a_dist / sum(a_dist)
                         a = np.random.choice(a_dist, p=a_dist)
                         a = np.argmax(a_dist == a)
 
@@ -168,9 +169,9 @@ if __name__ == '__main__':
 
     max_episode_length = 10000
     max_episode = 10000
-    gamma = 1.0  # discount rate for advantage estimation and reward discounting
+    gamma = 0.9  # discount rate for advantage estimation and reward discounting
 
-    len_of_queue = 10
+    len_of_queue = 20
     num_of_processes = 7
     s_size = num_of_processes * len_of_queue + num_of_processes
     a_size = len_of_queue
