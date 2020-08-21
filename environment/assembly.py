@@ -76,22 +76,18 @@ class Assembly(object):
         # 각 공정별 블록의 남은 작업 시간 정보
         # 각 공정에 작업이 진행 중인 블록들의 계획(작업 시간) 정보
         remaining_working_time = []
-        planned_working_time_in_process = []
         now = self.env.now  # 현재 시각
         for i in range(self.num_of_processes):
             process = self.model['Process{0}'.format(i)]  # modeling한 Process
             for server in process.server:
                 if not server.part:
                     remaining_working_time.append(0.0)
-                    planned_working_time_in_process.extend([0.0] * self.num_of_processes)
                     continue
                 part_id, working_time = server.part.id, server.part.data[(server.part.step, 'process_time')]
                 part_start_time = server.working_start
                 remaining_working_time.append(working_time - (now - part_start_time))
                 working_times = (server.part.data[:, 'process_time'])[:self.num_of_processes]
-                planned_working_time_in_process.extend(working_times)
         state[:self.num_of_processes] = remaining_working_time
-        state[self.num_of_processes:self.num_of_processes + len(planned_working_time_in_process)] = planned_working_time_in_process
 
         # queue에 대기하고 있는 블록들의 계획(작업 시간) 정보
         planned_working_time_in_queue = []
@@ -99,7 +95,7 @@ class Assembly(object):
             working_time = panel_block.data[:, 'process_time']
             planned_working_time_in_queue += list(working_time[:self.num_of_processes])
 
-        state[self.num_of_processes + self.num_of_processes**2:self.num_of_processes + self.num_of_processes**2 + len(planned_working_time_in_queue)] = planned_working_time_in_queue
+        state[self.num_of_processes:self.num_of_processes + len(planned_working_time_in_queue)] = planned_working_time_in_queue
 
         return state
 

@@ -117,7 +117,7 @@ class Worker():
 
                         # If the episode hasn't ended, but the experience buffer is full, then we
                         # make an update step using that experience rollout.
-                        if len(episode_buffer) == 5 and d != True and episode_step_count != max_episode_length - 1:
+                        if len(episode_buffer) == 10 and d != True and episode_step_count != max_episode_length - 1:
                             # Since we don't know what the true final return is, we "bootstrap" from our current
                             # value estimation.
                             v1 = sess.run(self.local_AC.value,
@@ -194,7 +194,7 @@ if __name__ == '__main__':
 
     with tf.device("/cpu:0"):
         global_episodes = tf.Variable(0, dtype=tf.int32, name='global_episodes', trainable=False)
-        trainer = tf.train.AdamOptimizer(learning_rate=1e-5)
+        trainer = tf.train.AdamOptimizer(learning_rate=1e-6)
         master_network = AC_Network(s_size, a_size, 'global', None)  # Generate global network
         num_workers = multiprocessing.cpu_count()  # Set workers to number of available CPU threads
         workers = []

@@ -12,11 +12,12 @@ import plotly.figure_factory as ff
 
 
 class Utilization(object):
-    def __init__(self, data, process_dict, process):
+    def __init__(self, data, process_dict, process, finish_time):
         self.data = data
         self.process_dict = process_dict
         self.process = process  # utilization을 계산할 Process 혹은 Server
         self.type = "Process" if process in process_dict.keys() else "Server"
+        self.finish_time = finish_time
 
     # 공정에 관한 event 중 work_start인 event의 시간 저장 (총 시간 계산, working time 시간 계산 시 사용)
     # 공정에 관한 event 중 part_transferred인 event의 시간 저장 (총 시간 계산)
@@ -29,28 +30,21 @@ class Utilization(object):
             return u, idle, working_time
         self.data = self.data.loc[True, :]
 
-        if self.type == "Process":
-            time_start = self.data["TIME"][self.data["EVENT"] == "queue_entered"]
-        else:
-            time_start = self.data["TIME"][self.data["EVENT"] == "queue_released"]
-
-        time_finish = self.data["TIME"][self.data["EVENT"] == "part_transferred"]
+        start_time = 0
 
         work_start = self.data["TIME"][self.data["EVENT"] == "work_start"]
         work_finish = self.data["TIME"][self.data["EVENT"] == "work_finish"]
 
-        time_start = time_start.reset_index(drop=True)
-        time_finish = time_finish.reset_index(drop=True)
         work_start = work_start.reset_index(drop=True)
         work_finish = work_finish.reset_index(drop=True)
 
-        if len(time_start) * len(work_start) * len(time_finish) * len(work_finish) == 0:
+        if len(work_start) * len(work_finish) == 0:
             u, idle, working_time = 0, 0, 0
             return u, idle, working_time
 
         # 총 가동 시간
         server_num = self.process_dict[self.process].server_num if self.type == "Process" else 1
-        total_time = (time_finish[len(time_finish) - 1] - time_start[0]) * server_num
+        total_time = (self.finish_time - start_time) * server_num
 
         # 총 작업 시간
         df_working = work_finish - work_start
