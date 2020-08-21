@@ -17,7 +17,7 @@ class Assembly(object):
         self.inbound_panel_blocks = inbound_panel_blocks
         self.inbound_panel_blocks_clone = self.inbound_panel_blocks[:]
         self.a_size = len_of_queue
-        self.s_size = num_of_processes * len_of_queue + num_of_processes
+        self.s_size = num_of_processes ** 2 + num_of_processes * len_of_queue + num_of_processes
         self.env, self.model, self.monitor = self._modeling(self.num_of_processes, self.event_path)
         self.queue = []
         self.time = 0.0
@@ -74,26 +74,32 @@ class Assembly(object):
                 self.queue.append(panel_block)
 
         # 각 공정별 블록의 남은 작업 시간 정보
+        # 각 공정에 작업이 진행 중인 블록들의 계획(작업 시간) 정보
         remaining_working_time = []
+        planned_working_time_in_process = []
         now = self.env.now  # 현재 시각
         for i in range(self.num_of_processes):
             process = self.model['Process{0}'.format(i)]  # modeling한 Process
             for server in process.server:
                 if not server.part:
                     remaining_working_time.append(0.0)
+                    planned_working_time_in_process.extend([0.0] * self.num_of_processes)
                     continue
                 part_id, working_time = server.part.id, server.part.data[(server.part.step, 'process_time')]
                 part_start_time = server.working_start
                 remaining_working_time.append(working_time - (now - part_start_time))
+                working_times = (server.part.data[:, 'process_time'])[:self.num_of_processes]
+                planned_working_time_in_process.extend(working_times)
         state[:self.num_of_processes] = remaining_working_time
+        state[self.num_of_processes:self.num_of_processes + len(planned_working_time_in_process)] = planned_working_time_in_process
 
-        # queue에 있는 블록의 각 공정에서의 작업 시간 정보
-        planned_working_time = []
+        # queue에 대기하고 있는 블록들의 계획(작업 시간) 정보
+        planned_working_time_in_queue = []
         for panel_block in self.queue:  # queue에 있는 블록 정보
             working_time = panel_block.data[:, 'process_time']
-            planned_working_time += list(working_time[:self.num_of_processes])
+            planned_working_time_in_queue += list(working_time[:self.num_of_processes])
 
-        state[self.num_of_processes:self.num_of_processes + len(planned_working_time)] = planned_working_time
+        state[self.num_of_processes + self.num_of_processes**2:self.num_of_processes + self.num_of_processes**2 + len(planned_working_time_in_queue)] = planned_working_time_in_queue
 
         return state
 
@@ -173,6 +179,7 @@ if __name__ == '__main__':
         print("step: {0} | parts_sent: {1} | parts_completed: {2} | reward: {3} | cumulative reward: {4} | time: {5}"
               .format(i, assembly.model['Process0'].parts_sent, assembly.model['Sink'].parts_rec, r, r_cum, t))
         s = s_next
+        print(s.reshape((-1, 7)))
         if d:
             break
 

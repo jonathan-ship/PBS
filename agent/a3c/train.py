@@ -117,7 +117,7 @@ class Worker():
 
                         # If the episode hasn't ended, but the experience buffer is full, then we
                         # make an update step using that experience rollout.
-                        if len(episode_buffer) == 30 and d != True and episode_step_count != max_episode_length - 1:
+                        if len(episode_buffer) == 5 and d != True and episode_step_count != max_episode_length - 1:
                             # Since we don't know what the true final return is, we "bootstrap" from our current
                             # value estimation.
                             v1 = sess.run(self.local_AC.value,
@@ -169,11 +169,11 @@ if __name__ == '__main__':
 
     max_episode_length = 10000
     max_episode = 10000
-    gamma = 0.9  # discount rate for advantage estimation and reward discounting
+    gamma = 0.95  # discount rate for advantage estimation and reward discounting
 
     len_of_queue = 20
     num_of_processes = 7
-    s_size = num_of_processes * len_of_queue + num_of_processes
+    s_size = num_of_processes ** 2 + num_of_processes * len_of_queue + num_of_processes
     a_size = len_of_queue
 
     load_model = False
@@ -198,8 +198,8 @@ if __name__ == '__main__':
         master_network = AC_Network(s_size, a_size, 'global', None)  # Generate global network
         num_workers = multiprocessing.cpu_count()  # Set workers to number of available CPU threads
         workers = []
-        if num_workers > 8:
-            num_workers = 8
+        if num_workers > 1:
+            num_workers = 1
         # Create worker classes
         for i in range(num_workers):
             panel_blocks = import_panel_block_schedule('../../environment/data/PBS_assy_sequence_gen_000.csv')
