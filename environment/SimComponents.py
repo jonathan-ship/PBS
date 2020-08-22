@@ -1,6 +1,10 @@
 import simpy
+import random
+
 import pandas as pd
 import numpy as np
+
+from environment.postprocessing import *
 
 
 class Part(object):
@@ -39,15 +43,15 @@ class Source(object):
                     yield self.env.timeout(part.data[(0, 'start_time')] - self.env.now)
 
             # record: part_created
-            self.Monitor.record(self.env.now, self.name, part_id=part.id, event="part_created")
+            self.Monitor.record(self.env.now, self.name, None, part_id=part.id, event="part_created")
 
             # next process
             next_process = part.data[(part.step, 'process')]
 
             # record: part_transferred
-            self.Monitor.record(self.env.now, self.name, part_id=part.id, event="part_transferred")
+            self.Monitor.record(self.env.now, self.name, None, part_id=part.id, event="part_transferred")
 
-            yield self.env.process(self.process_dict[next_process].put(part, self.name, 0))
+            yield self.env.process(self.process_dict[next_process].put(part, self.name, None, 0))
             self.parts_sent += 1
 
             if self.parts_sent == len(self.block_data):
@@ -61,7 +65,6 @@ class Process(object):
         self.name = name
         self.server_process_time = process_time[self.name] if process_time is not None else [None for _ in range(server_num)]
         self.server_num = server_num
-        self.event_tracer = None
         self.Monitor = monitor
         self.process_dict = process_dict
         self.server = [SubProcess(env, self.name, '{0}_{1}'.format(self.name, i), process_dict, self.server_process_time[i], self.Monitor) for i in range(server_num)]
@@ -71,7 +74,7 @@ class Process(object):
         self.parts_sent = 0
         self.server_idx = 0
 
-    def put(self, part, process_from, step):
+    def put(self, part, process_from, subprocess_from, step):
         # Routing
         routing = Routing(self.Monitor.filename, self.process_dict[self.name])
         if self.routing_logic == "most_unutilized":  # most_unutilized
@@ -90,12 +93,12 @@ class Process(object):
         if queue + server >= self.qlimit:
             self.server[self.server_idx].waiting.append(self.env.event())
             # record: delay_start
-            self.Monitor.record(self.env.now, process_from, part_id=part.id, event="delay_start")
+            self.Monitor.record(self.env.now, process_from, subprocess_from, part_id=part.id, event="delay_start")
             yield self.server[self.server_idx].waiting[-1]
             # record: delay_finish
-            self.Monitor.record(self.env.now, process_from, part_id=part.id, event="delay_finish")
+            self.Monitor.record(self.env.now, process_from, subprocess_from, part_id=part.id, event="delay_finish")
 
-        self.Monitor.record(self.env.now, self.server[self.server_idx].name, part_id=part.id, event="queue_entered")
+        self.Monitor.record(self.env.now, self.name, self.server[self.server_idx].name, part_id=part.id, event="queue_entered")
         self.server[self.server_idx].sub_queue.put(part)
 
     def get_num_of_part(self):
@@ -130,11 +133,11 @@ class SubProcess(object):
         while True:
             # queue로부터 part 가져오기
             self.part = yield self.sub_queue.get()
-            self.Monitor.record(self.env.now, self.name, part_id=self.part.id, event="queue_released")
+            self.Monitor.record(self.env.now, self.process_name, self.name, part_id=self.part.id, event="queue_released")
             self.flag = True
 
             # record: work_start
-            self.Monitor.record(self.env.now, self.name, part_id=self.part.id, event="work_start")
+            self.Monitor.record(self.env.now, self.process_name, self.name, part_id=self.part.id, event="work_start")
 
             # work start
             self.working_start = self.env.now
@@ -148,7 +151,7 @@ class SubProcess(object):
             yield self.env.timeout(proc_time)
 
             # record: work_finish
-            self.Monitor.record(self.env.now, self.name, part_id=self.part.id, event="work_finish")
+            self.Monitor.record(self.env.now, self.process_name, self.name, part_id=self.part.id, event="work_finish")
 
             step = 1
             while not self.part.data[(self.part.step + step, 'process_time')]:
@@ -160,10 +163,10 @@ class SubProcess(object):
             next_process = self.part.data[(self.part.step + step, 'process')]
 
             # record: part_transferred
-            self.Monitor.record(self.env.now, self.name, part_id=self.part.id, event="part_transferred")
+            self.Monitor.record(self.env.now, self.process_name, self.name, part_id=self.part.id, event="part_transferred")
 
             if self.process_dict[next_process].__class__.__name__ == 'Process':
-                yield self.env.process(self.process_dict[next_process].put(self.part, self.name, step))
+                yield self.env.process(self.process_dict[next_process].put(self.part, self.process_name, self.name, step))
             else:
                 self.process_dict[next_process].put(self.part)
             self.process_dict[self.process_name].parts_sent += 1
@@ -191,7 +194,7 @@ class Sink(object):
     def put(self, part):
         self.parts_rec += 1
         self.last_arrival = self.env.now
-        self.Monitor.record(self.env.now, self.name, part_id=part.id, event="completed")
+        self.Monitor.record(self.env.now, self.name, None, part_id=part.id, event="completed")
 
 
 class Routing(object):
@@ -202,14 +205,10 @@ class Routing(object):
         self.event_tracer = pd.read_csv(filename)
 
     def most_unutilized(self):
-        from environment.postprocessing import Utilization
-        import random
-
         utilization_list = []
         for i in range(self.server_num):
-            utilization = Utilization(self.event_tracer, self.process.process_dict, self.server[i].name)
-            server_utilization, _, _ = utilization.utilization()
-            utilization_list.append(server_utilization)
+            utilization, idle_time, working_time = cal_utilization(self.event_tracer, self.server[i].name, self.server[i].__class__.__name__)
+            utilization_list.append(utilization)
         idx_min_list = np.argwhere(utilization_list == np.min(utilization_list))
         idx_min_list = idx_min_list.flatten().tolist()
         idx_min = random.choice(idx_min_list)
@@ -220,10 +219,10 @@ class Monitor(object):
     def __init__(self, filename):
         self.filename = filename
         with open(self.filename, 'w', encoding='utf-8') as f:
-            f.write('TIME,EVENT,PART,PROCESS')
+            f.write('Time,Event,Part,Process,SubProcess')
 
-    def record(self, time, process, part_id=None, event=None):
+    def record(self, time, process, subprocess, part_id=None, event=None):
         with open(self.filename, 'a') as f:
-            f.write('\n{0},{1},{2},{3}'.format(time, event, part_id, process))
+            f.write('\n{0},{1},{2},{3},{4}'.format(time, event, part_id, process, subprocess))
 
 

@@ -6,7 +6,7 @@ import os
 
 import numpy as np
 
-from environment.postprocessing import Utilization
+from environment.postprocessing import *
 
 
 class Assembly(object):
@@ -17,7 +17,7 @@ class Assembly(object):
         self.inbound_panel_blocks = inbound_panel_blocks
         self.inbound_panel_blocks_clone = self.inbound_panel_blocks[:]
         self.a_size = len_of_queue
-        self.s_size = num_of_processes ** 2 + num_of_processes * len_of_queue + num_of_processes
+        self.s_size = num_of_processes * len_of_queue + num_of_processes * 4
         self.env, self.model, self.monitor = self._modeling(self.num_of_processes, self.event_path)
         self.queue = []
         self.time = 0.0
@@ -33,9 +33,9 @@ class Assembly(object):
             reward = -1
         else:
             block = self.queue.pop(action)
-            self.monitor.record(self.env.now, "Source", part_id=block.id, event="part_created")
-            self.env.process(self.model['Process0'].put(block, 'Source', 0))
-            self.monitor.record(self.env.now, "Source", part_id=block.id, event="part_transferred")
+            self.monitor.record(self.env.now, "Source", None, part_id=block.id, event="part_created")
+            self.env.process(self.model['Process0'].put(block, 'Source', None, 0))
+            self.monitor.record(self.env.now, "Source", None, part_id=block.id, event="part_transferred")
             self.num_of_blocks_put += 1
             while True:
                 self.env.step()
@@ -45,7 +45,7 @@ class Assembly(object):
                     break
             if len(self.queue) == 0:
                 done = True
-            reward = self._calculate_reward_by_TH()
+            reward = self._calculate_reward_by_complete_blocks()
             self.time = self.env.now
         next_state = self._get_state()
         if done:
@@ -74,34 +74,47 @@ class Assembly(object):
                 self.queue.append(panel_block)
 
         # 각 공정별 블록의 남은 작업 시간 정보
-        # 각 공정에 작업이 진행 중인 블록들의 계획(작업 시간) 정보
-        remaining_working_time = []
+        remaining_working_time, delay, utilization, throughput = [], [], [], []
         now = self.env.now  # 현재 시각
+        event_tracer = pd.read_csv(self.event_path)
         for i in range(self.num_of_processes):
             process = self.model['Process{0}'.format(i)]  # modeling한 Process
             for server in process.server:
+                u, _, _ = cal_utilization(event_tracer, server.name, server.__class__.__name__, finish_time=now)
+                th = cal_throughput(event_tracer, server.name, server.__class__.__name__, finish_time=now)
+                utilization.append(u)
+                throughput.append(th)
                 if not server.part:
                     remaining_working_time.append(0.0)
+                    delay.append(0.0)
                     continue
-                part_id, working_time = server.part.id, server.part.data[(server.part.step, 'process_time')]
+                working_time = server.part.data[(server.part.step, 'process_time')]
                 part_start_time = server.working_start
-                remaining_working_time.append(working_time - (now - part_start_time))
-                working_times = (server.part.data[:, 'process_time'])[:self.num_of_processes]
+                if working_time >= (now - part_start_time):
+                    remaining_working_time.append(working_time - (now - part_start_time))
+                    delay.append(0.0)
+                else:
+                    remaining_working_time.append(0.0)
+                    delay.append(1)
+
         state[:self.num_of_processes] = remaining_working_time
+        state[self.num_of_processes:self.num_of_processes * 2] = delay
+        state[self.num_of_processes * 2:self.num_of_processes * 3] = utilization
+        state[self.num_of_processes * 3:self.num_of_processes * 4] = throughput
 
         # queue에 대기하고 있는 블록들의 계획(작업 시간) 정보
-        planned_working_time_in_queue = []
+        planned_working_time = []
         for panel_block in self.queue:  # queue에 있는 블록 정보
             working_time = panel_block.data[:, 'process_time']
-            planned_working_time_in_queue += list(working_time[:self.num_of_processes])
+            planned_working_time += list(working_time[:self.num_of_processes])
 
-        state[self.num_of_processes:self.num_of_processes + len(planned_working_time_in_queue)] = planned_working_time_in_queue
+        state[self.num_of_processes * 4:self.num_of_processes * (4 + len(self.queue))] = planned_working_time
 
         return state
 
     def _calculate_reward_by_TH(self):
         event_tracer = pd.read_csv(self.event_path)
-        block_completed = event_tracer[event_tracer["EVENT"] == "completed"]
+        block_completed = event_tracer[event_tracer["Event"] == "completed"]
         num_of_block_completed = len(block_completed)
         throughput = num_of_block_completed / self.env.now
         return throughput * 10
@@ -125,7 +138,7 @@ class Assembly(object):
 
     def _calculate_reward_by_complete_blocks(self):
         event_tracer = pd.read_csv(self.event_path)
-        block_completed = event_tracer[(event_tracer['TIME'] > self.time) & (event_tracer["EVENT"] == "completed")]
+        block_completed = event_tracer[(event_tracer['Time'] > self.time) & (event_tracer["Time"] == "completed")]
         num_of_block_completed = len(block_completed)
         return num_of_block_completed
 
@@ -157,6 +170,7 @@ class AssemblyDisplay(object):
 
 if __name__ == '__main__':
     from environment.panelblock import *
+    from environment.postprocessing import *
     panel_blocks = import_panel_block_schedule('../environment/data/PBS_assy_sequence_gen_000.csv')
     num_of_processes = 7
     len_of_queue = 10
@@ -180,3 +194,8 @@ if __name__ == '__main__':
             break
 
     print(assembly.env.now)
+    data = pd.read_csv(event_path + '/event_PBS.csv')
+    u, idle, work = cal_utilization(data, 'Process1_0', 'SubProcess', start_time=57.0, finish_time=229.0)
+    lt = cal_leadtime(data, start_time=0.0, finish_time=assembly.env.now)
+    th = cal_throughput(data, "Process1", "Process", start_time=0.0, finish_time=assembly.env.now)
+    print(th)
