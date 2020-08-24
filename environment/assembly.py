@@ -6,8 +6,10 @@ import os
 
 import numpy as np
 
+from decimal import Decimal
 from environment.postprocessing import *
 
+random.seed(42)
 
 class Assembly(object):
     def __init__(self, num_of_processes, len_of_queue, event_path, inbound_panel_blocks=None, display_env=False):
@@ -45,7 +47,7 @@ class Assembly(object):
                     break
             if len(self.queue) == 0:
                 done = True
-            reward = self._calculate_reward_by_complete_blocks()
+            reward = self._calculate_reward()
             self.time = self.env.now
         next_state = self._get_state()
         if done:
@@ -58,6 +60,7 @@ class Assembly(object):
         for panel_block in self.inbound_panel_blocks:
             panel_block.step = 0
         random.shuffle(self.inbound_panel_blocks)
+        self.time = 0.0
         self.num_of_blocks_put = 0
         self.stage = 0
         return self._get_state()
@@ -111,6 +114,14 @@ class Assembly(object):
         state[self.num_of_processes * 4:self.num_of_processes * (4 + len(self.queue))] = planned_working_time
 
         return state
+
+    def _calculate_reward(self):
+        event_tracer = pd.read_csv(self.event_path)
+        data = event_tracer[event_tracer["Process"] == "Process0"]
+        data = data["Time"][(data["Time"] > self.time + 0.01) & ((data["Event"] == "delay_start") | (data["Event"] == "delay_finish"))]
+        idle_time = data.diff()
+        reward = 0.0 if idle_time.empty else - idle_time.iloc[-1]
+        return reward
 
     def _calculate_reward_by_TH(self):
         event_tracer = pd.read_csv(self.event_path)
@@ -189,7 +200,7 @@ if __name__ == '__main__':
         print("step: {0} | parts_sent: {1} | parts_completed: {2} | reward: {3} | cumulative reward: {4} | time: {5}"
               .format(i, assembly.model['Process0'].parts_sent, assembly.model['Sink'].parts_rec, r, r_cum, t))
         s = s_next
-        print(s.reshape((-1, 7)))
+        #print(s.reshape((-1, 7)))
         if d:
             break
 

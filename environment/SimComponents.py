@@ -4,6 +4,7 @@ import random
 import pandas as pd
 import numpy as np
 
+from decimal import Decimal
 from environment.postprocessing import *
 
 
@@ -98,6 +99,8 @@ class Process(object):
             # record: delay_finish
             self.Monitor.record(self.env.now, process_from, subprocess_from, part_id=part.id, event="delay_finish")
 
+        # record: part_transferred
+        self.Monitor.record(self.env.now, process_from, subprocess_from, part_id=part.id, event="part_transferred")
         self.Monitor.record(self.env.now, self.name, self.server[self.server_idx].name, part_id=part.id, event="queue_entered")
         self.server[self.server_idx].sub_queue.put(part)
 
@@ -161,9 +164,6 @@ class SubProcess(object):
                     break
 
             next_process = self.part.data[(self.part.step + step, 'process')]
-
-            # record: part_transferred
-            self.Monitor.record(self.env.now, self.process_name, self.name, part_id=self.part.id, event="part_transferred")
 
             if self.process_dict[next_process].__class__.__name__ == 'Process':
                 yield self.env.process(self.process_dict[next_process].put(self.part, self.process_name, self.name, step))

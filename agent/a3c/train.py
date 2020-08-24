@@ -117,7 +117,7 @@ class Worker():
 
                         # If the episode hasn't ended, but the experience buffer is full, then we
                         # make an update step using that experience rollout.
-                        if len(episode_buffer) == 10 and d != True and episode_step_count != max_episode_length - 1:
+                        if len(episode_buffer) == 15 and d != True and episode_step_count != max_episode_length - 1:
                             # Since we don't know what the true final return is, we "bootstrap" from our current
                             # value estimation.
                             v1 = sess.run(self.local_AC.value,
@@ -169,7 +169,7 @@ if __name__ == '__main__':
 
     max_episode_length = 10000
     max_episode = 10000
-    gamma = 0.95  # discount rate for advantage estimation and reward discounting
+    gamma = 1.0  # discount rate for advantage estimation and reward discounting
 
     len_of_queue = 20
     num_of_processes = 7
