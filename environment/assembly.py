@@ -109,7 +109,7 @@ class Assembly(object):
         for panel_block in self.queue:  # queue에 있는 블록 정보
             working_time = list(panel_block.data[:, 'process_time'])
             working_time = working_time[:self.num_of_processes]
-            working_time.append(np.mean(working_time))  # 각 작업시간의 평균
+            working_time.append(np.sum(working_time))  # 각 작업시간의 평균
             working_time.append(np.std(working_time))  # 각 작업시간의 표준편차
 
             planned_working_time += working_time
@@ -124,7 +124,7 @@ class Assembly(object):
         data = event_tracer[event_tracer["Process"] == "Process0"]
         data = data["Time"][(data["Time"] > self.time + 0.01) & ((data["Event"] == "delay_start") | (data["Event"] == "delay_finish"))]
         idle_time = data.diff()
-        reward = 0.0 if idle_time.empty else - idle_time.iloc[-1]
+        reward = 10 if idle_time.empty else 10 / idle_time.iloc[-1]
         return reward
 
     def _calculate_reward_by_TH(self):
