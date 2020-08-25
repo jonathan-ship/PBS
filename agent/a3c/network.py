@@ -17,11 +17,11 @@ class AC_Network():
         with tf.variable_scope(scope):
             # Input and visual encoding layers
             self.inputs = tf.placeholder(shape=[None, s_size], dtype=tf.float32)
-            hidden1 = slim.fully_connected(self.inputs, 512, activation_fn=tf.nn.elu, weights_initializer=tf.initializers.he_normal)
-            hidden2 = slim.fully_connected(hidden1, 512, activation_fn=tf.nn.elu, weights_initializer=tf.initializers.he_normal)
-            hidden3 = slim.fully_connected(hidden2, 128, activation_fn=tf.nn.elu, weights_initializer=tf.initializers.he_normal)
-            hidden4 = slim.fully_connected(hidden3, 128, activation_fn=tf.nn.elu, weights_initializer=tf.initializers.he_normal)
-            hidden5 = slim.fully_connected(hidden4, 128, activation_fn=tf.nn.elu, weights_initializer=tf.initializers.he_normal)
+            hidden1 = slim.fully_connected(self.inputs, 512, activation_fn=tf.nn.elu, weights_initializer=tf.initializers.he_normal())
+            hidden2 = slim.fully_connected(hidden1, 512, activation_fn=tf.nn.elu, weights_initializer=tf.initializers.he_normal())
+            hidden3 = slim.fully_connected(hidden2, 128, activation_fn=tf.nn.elu, weights_initializer=tf.initializers.he_normal())
+            hidden4 = slim.fully_connected(hidden3, 128, activation_fn=tf.nn.elu, weights_initializer=tf.initializers.he_normal())
+            hidden5 = slim.fully_connected(hidden4, 128, activation_fn=tf.nn.elu, weights_initializer=tf.initializers.he_normal())
 
             # Output layers for policy and value estimations
             self.policy = slim.fully_connected(hidden5, a_size,

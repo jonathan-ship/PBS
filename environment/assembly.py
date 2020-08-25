@@ -18,7 +18,7 @@ class Assembly(object):
         self.inbound_panel_blocks = inbound_panel_blocks
         self.inbound_panel_blocks_clone = self.inbound_panel_blocks[:]
         self.a_size = len_of_queue
-        self.s_size = num_of_processes * len_of_queue + num_of_processes * 4
+        self.s_size = (num_of_processes + 2) * len_of_queue + num_of_processes * 4
         self.env, self.model, self.monitor = self._modeling(self.num_of_processes, self.event_path)
         self.queue = []
         self.time = 0.0
@@ -107,10 +107,15 @@ class Assembly(object):
         # queue에 대기하고 있는 블록들의 계획(작업 시간) 정보
         planned_working_time = []
         for panel_block in self.queue:  # queue에 있는 블록 정보
-            working_time = panel_block.data[:, 'process_time']
-            planned_working_time += list(working_time[:self.num_of_processes])
+            working_time = list(panel_block.data[:, 'process_time'])
+            working_time = working_time[:self.num_of_processes]
+            working_time.append(np.mean(working_time))  # 각 작업시간의 평균
+            working_time.append(np.std(working_time))  # 각 작업시간의 표준편차
 
-        state[self.num_of_processes * 4:self.num_of_processes * (4 + len(self.queue))] = planned_working_time
+            planned_working_time += working_time
+
+        state[self.num_of_processes * 4:self.num_of_processes * 4 + (self.num_of_processes + 2) * len(
+            self.queue)] = planned_working_time
 
         return state
 

@@ -173,7 +173,7 @@ if __name__ == '__main__':
 
     len_of_queue = 20
     num_of_processes = 7
-    s_size = num_of_processes * len_of_queue + num_of_processes * 4
+    s_size = (num_of_processes + 2) * len_of_queue + num_of_processes * 4
     a_size = len_of_queue
 
     load_model = False
