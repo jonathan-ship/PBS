@@ -9,7 +9,6 @@ import numpy as np
 from decimal import Decimal
 from environment.postprocessing import *
 
-random.seed(42)
 
 class Assembly(object):
     def __init__(self, num_of_processes, len_of_queue, event_path, inbound_panel_blocks=None, display_env=False):
