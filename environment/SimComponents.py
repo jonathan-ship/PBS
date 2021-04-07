@@ -196,7 +196,7 @@ class Process(object):
 
     def _out_buffer(self):
         while True:
-            part = yield self.in_buffer.get()
+            part = yield self.out_buffer.get()
 
             # next process
             step = 1
@@ -210,7 +210,7 @@ class Process(object):
             next_process = self.model[next_process_name]
             if next_process.__class__.__name__ == 'Process':
                 # buffer's capacity of next process is full -> have to delay
-                if len(next_process.buffer_to_machine.items) == next_process.buffer_to_machine.capacity:
+                if len(next_process.in_buffer.items) == next_process.in_buffer.capacity:
                     next_process.waiting_pre_process[part.id] = self.env.event()
                     self.monitor.record(self.env.now, self.name, None, part_id=part.id, event="delay_start_out_buffer")
                     yield next_process.waiting_pre_process[part.id]
