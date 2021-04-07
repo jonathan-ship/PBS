@@ -4,8 +4,8 @@ import simpy
 import numpy as np
 import pandas as pd
 
-from environment.SimComponents import Process, Sink, Monitor
-from environment.PostProcessing import *
+from environment.SimComponents import Process, Sink, Monitor, Part
+from environment.postprocessing import *
 from environment.panelblock import *
 
 from io import StringIO
@@ -42,7 +42,8 @@ class Assembly(object):
         self.block = self.queue.pop(action)
         block_working_time = np.array(self.block.data[:, 'process_time'])[:self.num_of_processes]
         self.monitor.record(self.env.now, "Source", None, part_id=self.block.id, event="part_created")
-        self.model['Process0'].put(self.block)
+        # self.model['Process0'].in_buffer.put(self.block)
+        self.model['Process0'].machine[0].machine.put(self.block)
         self.monitor.record(self.env.now, "Source", None, part_id=self.block.id, event="part_transferred")
         self.num_of_blocks_put += 1
         while True:
@@ -59,7 +60,10 @@ class Assembly(object):
             done = True
 
         if len(self.inbound_panel_blocks) > 0 and len(self.queue) < self.len_of_queue:
-            self.queue.append(self.inbound_panel_blocks.pop(0))
+            part_data = self.inbound_panel_blocks.pop(0)
+            part = Part(part_data.id, part_data.data)
+            part.step = 0
+            self.queue.append(part)
 
         reward = self._calculate_reward()
         next_state = self._get_state()
@@ -77,12 +81,17 @@ class Assembly(object):
             self.inbound_panel_blocks = generate_block_schedule(self.num_of_parts)
         else:
             self.inbound_panel_blocks = self.inbound_panel_blocks_clone[:]
-            for panel_block in self.inbound_panel_blocks:
-                panel_block.step = 0
+            # for panel_block in self.inbound_panel_blocks:
+            #     panel_block.step = 0
         random.shuffle(self.inbound_panel_blocks)
         # self.inbound_panel_blocks = sorted(self.inbound_panel_blocks, key=lambda block: block.data.sum(level=1)["process_time"])
+
         for i in range(self.len_of_queue):
-            self.queue.append(self.inbound_panel_blocks.pop(0))
+            part_data = self.inbound_panel_blocks.pop(0)
+            part = Part(part_data.id, part_data.data)
+            part.step = 0
+            self.queue.append(part)
+
         self.stage = 0
         self.time = 0.0
         self.lead_time = 0.0
@@ -96,7 +105,7 @@ class Assembly(object):
         part_list = []
         for i in range(self.num_of_processes):
             process = self.model['Process{0}'.format(i)]
-            for server in process.server:
+            for server in process.machine:
                 if server.part:
                     part_list.append(server.part.id)
                 else:
@@ -115,7 +124,7 @@ class Assembly(object):
         server_feature = np.zeros(self.num_of_processes)
         for i in range(self.num_of_processes):
             process = self.model['Process{0}'.format(i)]
-            for server in process.server:
+            for server in process.machine:
                 if server.part:
                     working_time_list = server.part.data.loc[slice(None), 'process_time']
                     working_time = working_time_list[server.part.step]
@@ -167,9 +176,9 @@ class Assembly(object):
         model = {}
         monitor = Monitor(event_path)
         for i in range(num_of_processes + 1):
-            model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, monitor, qlimit=1)
+            model['Process{0}'.format(i)] = Process(env, 'Process{0}'.format(i), 1, model, monitor, capacity=1)
             if i == num_of_processes:
-                model['Sink'] = Sink(env, 'Sink', monitor)
+                model['Sink'] = Sink(env, monitor)
         return env, model, monitor
 
     def _predict_lead_time(self, block_working_time, part_transfer):
@@ -201,7 +210,7 @@ if __name__ == '__main__':
     if not os.path.exists(event_path):
         os.makedirs(event_path)
 
-    panel_blocks = import_panel_block_schedule('./data/PBS_assy_sequence_gen_000.csv')
+    panel_blocks = import_panel_block_schedule('../data/PBS_assy_sequence_gen_000.csv')
     # panel_blocks = generate_block_schedule(num_of_parts)
     assembly = Assembly(num_of_processes, len_of_queue, num_of_parts, event_path + '/event_PBS.csv',
                         inbound_panel_blocks=panel_blocks)
@@ -212,7 +221,7 @@ if __name__ == '__main__':
     print(s)
     for i in range(70):
         # print(assembly.queue[0].data.sum(level=1)["process_time"])
-        s_next, r, d = assembly.step(0)
+        s_next, r, d= assembly.step(0)
         r_cum += r
         print("step: {0} | parts_sent: {1} | parts_completed: {2} | reward: {3} | cumulative reward: {4}"
               .format(i, assembly.model['Process0'].parts_sent, assembly.model['Sink'].parts_rec, r, r_cum))
