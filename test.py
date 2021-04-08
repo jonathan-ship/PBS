@@ -15,6 +15,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
+
 def simulation(panel_blocks, num_of_processes, len_of_queue, num_of_parts, model_path=None, event_path=None, method="SPT"):
     if method == "RL":
         state_size = num_of_processes + num_of_processes * len_of_queue
@@ -103,12 +104,16 @@ if __name__ == "__main__":
 
     for i in range(test_iteration):
         print("iteration {0} ".format(i) + "=" * 100)
+        panel_blocks = generate_block_schedule(num_of_parts)
+        panel_blocks_clone = panel_blocks[:]
         for method in results.keys():
-            panel_blocks = generate_block_schedule(num_of_parts)
             # panel_blocks = import_panel_block_schedule('../environment/data/PBS_assy_sequence_gen_000.csv')
             # num_of_parts = len(panel_blocks)
             lead_time = simulation(panel_blocks, num_of_processes, len_of_queue, num_of_parts, model_path, event_path, method=method)
             results[method].append(lead_time)
+            panel_blocks = panel_blocks_clone[:]
+            for blk in panel_blocks:
+                blk.step = 0
 
     df_results = pd.DataFrame(results)
     df_results.to_csv(test_path + "/results.csv")

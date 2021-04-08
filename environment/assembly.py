@@ -210,7 +210,7 @@ if __name__ == '__main__':
     if not os.path.exists(event_path):
         os.makedirs(event_path)
 
-    panel_blocks = import_panel_block_schedule('../data/PBS_assy_sequence_gen_000.csv')
+    panel_blocks = import_panel_block_schedule('./data/PBS_assy_sequence_gen_000.csv')
     # panel_blocks = generate_block_schedule(num_of_parts)
     assembly = Assembly(num_of_processes, len_of_queue, num_of_parts, event_path + '/event_PBS.csv',
                         inbound_panel_blocks=panel_blocks)
